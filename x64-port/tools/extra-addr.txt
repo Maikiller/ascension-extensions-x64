@@ -1,0 +1,278 @@
+# Enderecos do Ascension.exe 12340 sem marca OFFSET/STATIC no fonte do cliente -> simbolo no PDB do WowClient64.
+# Formato: 0xADDR Nome::Exato   (procedimento)    |   0xADDR =0xBASE+0xOFF64   (campo de variavel; OFF64 = offset x64)
+# Lido por mapaddr.py; a tabela .addr e regenerada sem recompilar o cliente.
+
+# --- funcoes (instancias de template / bibliotecas)
+0x403880 CDataStore::~CDataStore
+0x863A40 deflate
+0x863E50 deflateEnd
+0x864DC0 deflateInit2_
+0x865080 inflateInit2_
+0x865270 inflate
+0x866660 inflateEnd
+
+# --- WowClientDB_Base x86 {vft 0, loaded 4, numRecords 8, maxID C, minID 10, strings 14, records 1C, recordsById 20}
+#     x64 {vft 0, loaded 8, numRecords C, maxID 10, minID 14, strings 18, records 28, recordsById 30}
+0xAD30D0 =0xAD30C8+0xC
+0xAD33A0 =0xAD3398+0xC
+0xAD33B8 =0xAD3398+0x30
+0xAD3410 =0xAD3404+0x10
+0xAD3414 =0xAD3404+0x14
+0xAD3424 =0xAD3404+0x30
+0xAD373C =0xAD371C+0x30
+0xAD3760 =0xAD3740+0x30
+0xAD416C =0xAD4160+0x10
+0xAD4170 =0xAD4160+0x14
+0xAD4180 =0xAD4160+0x30
+0xAD45EC =0xAD45E0+0x10
+0xAD45F0 =0xAD45E0+0x14
+0xAD4600 =0xAD45E0+0x30
+0xAD4898 =0xAD488C+0x10
+0xAD489C =0xAD488C+0x14
+0xAD4994 =0xAD4988+0x10
+0xAD4998 =0xAD4988+0x14
+0xAD49A8 =0xAD4988+0x30
+0xAD49DC =0xAD49D0+0x10
+0xAD4A90 =0xAD4A84+0x10
+0xAD4A94 =0xAD4A84+0x14
+0xAD4AB4 =0xAD4AA8+0x10
+0xAD4AB8 =0xAD4AA8+0x14
+0xAD4AC8 =0xAD4AA8+0x30
+
+# --- outras structs globais
+0xB6B240 =0xB6B238+0x8    # TSGrowableArray<CharacterSelectionDisplay>::m_data
+0xBEB204 =0xBEB1FC+0x8    # CGMailInfo::m_inbox.m_data
+0xBD07B4 =0xBD07B0+0x4    # CGGameUI::m_lockedTarget (metade alta)
+0xC79C9E =0xC79B98+0x106  # ClientServices::m_selectRealmInfo.m_realmAddress
+0xCD774D =0xCD774C+0x1    # CWorld::enables (bytes)
+0xCD774E =0xCD774C+0x2
+0xCD774F =0xCD774C+0x3
+0xD38B48 =0xD38B00+0x48   # DayNight::g_dnInfo.m_deltaSec
+0xD38CCC =0xD38B00+0x1F0  # DayNight::g_dnInfo.m_showSky (x86 +0x1CC)
+0xD38E48 =0xD38E28+0x28   # DayNight::g_planets.m_moon (x86 +0x20)
+0xD38E68 =0xD38E28+0x50   # DayNight::g_planets.m_moon2 (x86 +0x40)
+0xD3F7D4 =0xD3F7D0+0x4    # s_scriptEvents.m_count
+
+# --- dados alvo de WriteCode/PatchByte
+0xAB6160 =0xAB6158+0x8    # s_dataDirectories[1] (x86 [4*1], x64 [8*1])
+0xADB88C =0xADB820+0xD8   # s_combatTextTypes[27] (x86 0x6C = 27*4)
+0xD37F98 =0xD37F98+0x0    # g_clientGameTime (minuto)
+0xD37F9C =0xD37F98+0x4    # g_clientGameTime (hora)
+0xD37FC8 =0xD37F98+0x30   # g_clientGameTime.m_minutesPerSecond
+0x67CA30 DBCache<ItemStats_C,int,HASHKEY_INT>::GetRecord
+0x67DE90 DBCache<QuestCache,int,HASHKEY_INT>::GetRecord
+0x67B6A0 DBCache<CreatureStats_C,int,HASHKEY_INT>::GetRecord
+0x67D770 DBCache<NameCache,unsigned __int64,CHashKeyGUID>::GetRecord
+0x67EF70 DBCache<CGPetition,int,HASHKEY_INT>::GetRecord
+
+# --- proposta projects-2c (ALTA) + s_iconPositions
+0x4CFD20 WowClientDB_RLE<SpellRec>::GetRecord
+0x55F4D0 TSHashTable<UIADDON,HASHKEY_STRI>::Ptr
+0x991050 FT_Get_Kerning
+0x9911A0 FT_Get_Char_Index
+0x991320 FT_New_Library
+0x992610 FT_Done_Face
+0x992780 FT_Set_Pixel_Sizes
+0x992B60 FT_Render_Glyph
+0x992CB0 FT_Done_Library
+0x992DA0 FT_Load_Glyph
+0x993370 FT_New_Memory_Face
+0xAF4880 =0xAF487C+0x4
+0xAF4888 =0xAF4884+0x4
+0xAF488C =0xAF4884+0x8
+0xAF4890 =0xAF4884+0xC
+0xAF4894 =0xAF4884+0x10
+0xAF4898 =0xAF4884+0x14
+0xAF489C =0xAF4884+0x18
+0xAF48A0 =0xAF4884+0x1C
+0xAF48A4 =0xAF4884+0x20
+# --- mid-function (midpatch-x64.md, projects-2c)
+0x4041BD InitializeClient +0x94
+0x50D2B7 Script_SendChatMessage +0x18A
+0x50D641 Script_SendChatMessage +0x48A
+# 0x52B27A: antes "+0x3F7" (errado: caia no teste CharacterLoggingOut). Agora pela ancora 0x52B259 (REA 31/10)
+0x59714D CGCharacterModelBase::RotateModel +0x69
+0x5971C1 CGCharacterModelBase::UpdateModel +0x15
+0x5A8C70 CGActionBar::GetSpell +0x56
+0x5B01C8 CGCurrencyTypes::BuildDisplayList +0x1DD
+0x60FAB2 Script_UnitLevel +0xF4
+0x614AF8 PushUnitAura +0x344
+0x62442C CGTooltip::SetSpell +0x431
+0x631760 CGItemStatsSummary::GetItemComparison +0x1E9
+0x68E4AD CGxDeviceD3d::DeviceSetBaseMipLevel +0x28
+0x6BE290 GxuFontInitialize +0x8B
+0x6CA067 TEXTURECACHE::CreateTexture +0x24
+0x71557D CGUnit_C::ObjectNameVisibilityChanged +0x21
+0x715586 CGUnit_C::ObjectNameVisibilityChanged +0x2B
+0x729D3D CGUnit_C::ShouldRenderObjectName +0xD2
+0x72B07A CGUnit_C::ShouldShowNamePlate +0x2C
+0x7370AF CGUnit_C::SetSheatheState +0x1AD
+0x73A0D0 CGUnit_C::CheckAndReportSpellInhibitFlags +0xA52
+0x7569B6 Packet_Group_29 +0x216
+0x792AF2 CWorldScene::AddMapObjDefGroup +0x24
+0x792AFF CWorldScene::AddMapObjDefGroup +0x31
+0x793115 CWorldScene::CullEntitys +0x94
+0x793126 CWorldScene::CullEntitys +0xA5
+0x79313F CWorldScene::CullEntitys +0xBE
+0x793A45 CWorldScene::RenderEntitys +0xBF
+0x7AD2EE CMapObj::RenderInterior +0x153
+0x7B3A8E CMapObjDef::CullMapObjDefGroupFromExterior +0x88
+0x7B3AAF CMapObjDef::CullMapObjDefGroupFromExterior +0x9F
+0x7EC15A DayNight::LoadLightingBands +0x1F9
+0x808323 Spell_C_SpellFailed +0x146
+0x80C8C1 Spell_C_BeginCast +0x132
+0x80D6EF Spell_C_CastSpell +0x7E5
+0x80DB37 Spell_C_ClickSpell +0xAF
+0x8540D7 luaopen_string +0x17
+0x989B97 CMovementShared::SetRawFacing +0x31
+
+# (cliente novo: 07-portrait-mask cobre) 0x61935B @0x3B941C   # SetPortraitTexture(CSimpleTexture*, const char*) +0x4C, 74 11
+0x728AA1 @0x2C7F40   # CGUnit_C::DoPowerRegen +0x90, 40 80 FF 06
+# --- operands-x64 / fixes-6a-4 (projects-6a)
+# (b) operandos x64 -- sites de out/operands-x64-parcial.md (x86 -> RVA x64), bytes stock x64 no comentario
+0x464C4F RealmConnection::HandleCharEnum +0x4A   # HandleCharEnum, 80 7C 24 70 0A
+0x5663D4 CGUIMacros::SetMacroBody +0x40   # SetMacroBody, 81 FB 00 01 00 00
+0x56E499 Script_CheckInbox +0x4A   # Script_CheckInbox, 05 60 EA 00 00
+0x574A5F Script_ConvertToRaid +0x47   # Script_ConvertToRaid, 83 B8 C0 00 00 00 0A
+0x611717 Script_GetComboPoints +0xC5   # Script_GetComboPoints, 80 F9 0B 75 36
+0x7FF2A5 SpellRec::GetCastTime +0x147   # SpellRec, 81 C3 F4 01 00 00
+0x5AE56B CGEquipmentManager::GetNextFreeSetID +0x2E   # GetNextFreeSetID, 83 FB 0A
+0x5AF142 Script_GetEquipmentSetInfo +0x2F   # Script_GetEquipmentSetInfo, 83 F8 09
+0x5AF485 CGEquipmentManager::CanCreateSet +0x36   # CanCreateSet, 83 FB 0A
+0x5AF548 Packet_SMSG_EQUIPMENT_SET_LIST +0xF0   # SMSG_EQUIPMENT_SET_LIST, 41 83 FE 0A
+0x5AF809 CGEquipmentManager::CreateEquipmentSet +0x46   # CreateEquipmentSet, 83 FB 0A
+0x5AFB64 Script_SaveEquipmentSet +0x1EA   # Script_SaveEquipmentSet, 41 B8 0A 00 00 00
+0x632163 NetClient::GetNetStats +0xB0   # GetNetStats, 83 FA 10
+0x63264A NetClient::HandlePong +0xA2   # HandlePong, 83 F8 10
+0x63266A NetClient::HandlePong +0xC2   # HandlePong, 83 F8 10
+0x632DE5 NetClient::HandleIdle +0x3E   # HandleIdle, BA D0 8A FF FF
+0x54CFD4 CGBattlefieldInfo::RequestPlayerPositions +0x65   # RequestPlayerPositions, 8D 83 88 13 00 00
+0x4910DB CSimpleFrame::SetFrameLevel +0x5C   # SetFrameLevel, BA 80 00 00 00
+0x802221 Script_CancelItemTempEnchantment +0x42   # Script_CancelItemTempEnchantment, 77 3F
+0x59DC63 Script_PlaceAuctionBid +0x217   # Script_PlaceAuctionBid, 74 24
+0x5A5163 CGGuildBankInfo::SwapItems +0xB9   # GuildBank SwapItems, 74 16
+0x5A522F CGGuildBankInfo::SwapItems +0x15D   # GuildBank SwapItems, 75 14
+0x5A52E4 CGGuildBankInfo::SwapItems +0x1FE   # GuildBank SwapItems, 75 0F
+0x5A5472 CGGuildBankInfo::SwapBankItems +0x6B   # GuildBank SwapBankItems, 75 0F
+0x5A6506 Script_AutoStoreGuildBankItem +0xE9   # Script_AutoStoreGuildBankItem, 75 0F
+0x5A6956 Script_GetGuildBankTabInfo +0x180   # Script_GetGuildBankTabInfo, 74 0F
+0x5AC94D CGGMTicketInfo::CreateTicket +0x6E   # CGGMTicketInfo, 0F 84 25 02 00 00
+0x5CF2F6 Script_OfferPetition +0xB7   # Script_OfferPetition, 75 0F
+0x5AD0B0 Script_NewGMTicket +0x33   # Script_NewGMTicket, 85 C0 74 4E
+0x5D6E9C SendRequestPetInfo +0x3F   # SendRequestPetInfo, 75 07
+0x52ABD9 CGGameUI::InitializeFrameXML +0x2A1   # InitializeFrameXML, 8B C8
+0x52ADCC CGGameUI::InitializeFrameXML +0x401   # InitializeFrameXML, E8 3A B4 05 00
+0x4E4BC2 CGlueMgr::SurveyExecute +0xE2   # CGlueMgr, 0F 82 8D 02 00 00
+0x4E57FE CGlueMgr::PatchDownloadApply +0xBF   # CGlueMgr, 72 5B
+0x707BA3 OnUpdateDurability +0xF8   # OnUpdateDurability, 7E 3C
+0x707BE2 OnUpdateDurability +0x89   # OnUpdateDurability, E8 32 86 03 00
+0x708328 @0x2F2D5A   # CGItem_C, 0F 85 86 03 00 00
+0x634B07 InitResistances +0x2E   # InitResistances, 76 17
+0x74135D CGUnit_C::Dismount +0x6B   # CGUnit_C, 74 73
+0x57E9A8 CGMinimapFrame::CountAvailableTrackingTypes +0x35   # CGMinimapFrame, 0F B6 49 45
+0x57EB27 CGMinimapFrame::GetTrackingTypeByIndex +0x39   # GetTrackingTypeInfo, 41 B8 01 00 00 00 0F B6 49 45 41 D3 E0
+0x731480 CGUnit_C::OnRightClick +0x24E   # CGUnit_C, 7D 17
+0x70ED92 CGGameObject_C::Reenable +0x41   # CGGameObject_C, 75 2E
+0x71C2C0 CGUnit_C::GetPredictedHealth +0x0   # CGUnit_C, 48 8B 05 31 8B 85 00 83 78 54 00 74 07 8B 81 1C 18 00 00 C3
+0x783310 CWorld::Update +0x39F   # CWorld, 76 57
+0x819A74 Script_debuglocals +0x2B   # Script_debuglocals, 75 07
+0x634E28 ClientDBInitialize +0x26   # ClientDBInitialize, C7 05 D0 C4 7C 00 01 00 00 00
+0x5CBA74 Packet_MSG_GUILD_PERMISSIONS +0x82   # Packet_MSG_GUILD_PERMISSIONS, 88 05 9C EF 6C 00
+0x81C9A8 CM2Scene::SetTime +0x19   # CM2Scene, 33 D2
+0x81C9D9 CM2Scene::AdvanceTime +0x1F   # CM2Scene, 33 D2
+0x5FD886 ValidateCameraLinearSpeed +0x20   # ValidateCameraLinearSpeed, 72 07
+0x517EE8 PlacedFrameCallback +0x13D   # PlacedFrameCallback, 45 8B
+0x5184E1 LoadPlacedFrames +0x19D   # LoadPlacedFrames, 48 8D
+# sites de modulo (AscClientOptions)
+0x720020 CGUnit_C::ChatBubbleShow +0x18   # ChatBubbleShow, 0F 85 3C 01 00 00
+0x725737 CGUnit_C::NamePlateAddOrUpdate +0x88   # NamePlateAddOrUpdate, 74
+0x73D46A CGUnit_C::OnCollideFallLand +0x8A   # OnCollideFallLand, 7E
+# extra-addr exigido por x64-fixes-6a-4.diff (AscSpellVisuals: retorno do call r10 / vtable+0x178 em OnSpellGo)
+0x80ED4E PendingSpellCast::OnSpellGo +0xCB1
+# --- asm-x64 (projects-2c)
+# extra-addr exigido por asm-x64.diff (AscGlobalsJ: endereco de retorno testado pelos detours)
+0x75520B CGUnit_C::PlayAttackerRound +0x10B   # CGUnit_C::PlayAttackerRound+0x10B, retorno do call PlayBaseAnimation (Detour7385C0)
+0x4F7FB6 CGWorldFrame::CursorTrackUnit +0x4E4   # CGWorldFrame::CursorTrackUnit+0x4E4, retorno do call GetMeleeRange (Detour4F5F40)
+0xAD3F08 =0xAD3EFC+0x10
+0xAD3F0C =0xAD3EFC+0x14
+# --- x64-addontaint-5f7e90 (projects-2c)
+# extra-addr exigido por x64-addontaint-5f7e90.diff (Hook5F7E90: retorno dos calls de IsAddOnLoadable)
+0x5F8076 LoadAddOnFileCount +0xB4   # LoadAddOnFileCount+0xB4, retorno do 2o call IsAddOnLoadable (o do addon->m_key)
+0x5F80FF LoadAddOn +0x80   # LoadAddOn+0x80, retorno do call IsAddOnLoadable
+# --- x64-sites-ClientOptions-GlobalsJ-Camera-Graphics (projects-2c)
+0x80D7C1 Spell_C_CastSpell +0x877   # Spell_C_CastSpell+0x877, je 74 08 (OnAutoAssistCast)
+0x80C91D Spell_C_BeginCast +0x17E   # Spell_C_BeginCast+0x17E, or dword [rip],0x80 (OnAutoAssistCast)
+0x621766 CGTooltip::SetUnit +0x801   # CGTooltip::SetUnit+0x801, jg 7F 04 (OnHideDangerousEnemyLevel)
+0x720E68 CGUnit_C::UpdateSpellCastBars +0x2D   # CGUnit_C::UpdateSpellCastBars+0x2D, jne do GUID (SetNamePlateCastBarMode)
+0x524DC1 CGGameUI::Target +0x1F4   # CGGameUI::Target+0x1F4, call OsGetAsyncTimeMs + UpdateSpellCastBars (15 bytes)
+0x524276 CGGameUI::ClearTarget +0xA7   # CGGameUI::ClearTarget+0xA7, call StopNamePlateSpellbar (8 bytes)
+0x5FC6C8 Script_CameraOrSelectOrMoveStart +0xD   # Script_CameraOrSelectOrMoveStart+0xD, xor ecx,ecx (CanPerformAction arg)
+0x5FC73B Script_CameraOrSelectOrMoveStop +0x14   # Script_CameraOrSelectOrMoveStop+0x14, xor ecx,ecx
+0x5209A8 CGGameUI::SetCursorSpell +0x51   # CGGameUI::SetCursorSpell, jne (Attack 0x4E)
+0x5209B8 CGGameUI::SetCursorSpell +0x5F   # CGGameUI::SetCursorSpell, je (ranged)
+0x53DC8A CGSpellBook::GetSpellTexture +0x8D   # CGSpellBook::GetSpellTexture, jne
+0x53DCAC CGSpellBook::GetSpellTexture +0x9E   # CGSpellBook::GetSpellTexture, je
+0x540B66 Script_GetSpellInfo +0x15E   # Script_GetSpellInfo, jne
+0x540B76 Script_GetSpellInfo +0x16F   # Script_GetSpellInfo, je
+0x5FFD34 CGCamera::IsBobbingAllowed +0x21   # CGCamera::IsBobbingAllowed+0x21, ja 77 7D (OnActionCam/OnHeadBobs)
+0x72E870 CGUnit_C::OnTurnStartLocal +0x9E   # CGUnit_C::OnTurnStartLocal+0x9E, jne 75 14 (OnEnemyFocus)
+0x72E5FE CGUnit_C::OnMoveStartLocal +0x37   # CGUnit_C::OnMoveStartLocal+0x37, jne 75 11
+0x72E6AE CGUnit_C::OnStrafeStartLocal +0x37   # CGUnit_C::OnStrafeStartLocal+0x37, jne 75 11
+0x5FBC80 CGInputControl::UpdatePlayer +0xFD   # CGInputControl::UpdatePlayer+0xFD, jne 75 0D
+0x727520 CGPlayer_C::ClickToMove +0x15B   # +0x15B no cliente 55144e8 (era +0x153), movss [s_trackingTurnRate],xmm0 (OnTurnSpeed)
+0x731720 CGUnit_C::HandleTrackingFacing +0xF7   # CGUnit_C::HandleTrackingFacing+0xF7, movss [s_trackingTurnRate],xmm0
+0x791E60 CWorldScene::AddDoodadDefModelToModelScene +0x182   # CWorldScene::AddDoodadDefModelToModelScene+0x182, movss [rax+0x208],xmm6 (OnM2Collision)
+0x75697C Packet_Group_29 +0x1D7   # Packet_Group_29+0x1D7, jne 75 16 (OnAutoTarget)
+0x806AA2 PendingSpellCast::OnSpellStartPacket +0x376   # PendingSpellCast::OnSpellStart+0x376, jne 75 17
+0x79AA42 CWorldScene::Render +0x275   # CWorldScene::Render+0x275, jbe 76 0E (OnTerrainCulling)
+0x81E548 CM2Scene::SelectLights +0x166   # CM2Scene::SelectLights+0x166, je 74 0C (OnLightCulling/OnLightAttenuation)
+0x7F1777 DayNight::UpdateFog +0xBF   # DayNight::UpdateFog+0xBF, movss [m_fog.m_density] S1 (OnFogDensity)
+0x7F19F4 DayNight::UpdateFog +0x3B5   # DayNight::UpdateFog+0x3B5, S4
+0x7F1A49 DayNight::UpdateFog +0x3EB   # DayNight::UpdateFog+0x3EB, S5 (m_fogInterior.m_density)
+0x7F1A13 DayNight::UpdateFog +0x40A   # DayNight::UpdateFog+0x40A, S6
+0x7F1A1B DayNight::UpdateFog +0x412   # DayNight::UpdateFog+0x412, S7
+0x7ED982 DayNight::CurrentLight::operator= +0x6D   # DayNight::CurrentLight::operator=+0x6D, mov [rcx+0x48],eax (OnFogDistance)
+0x7D8444 CMapObjGroup::Create +0x157   # CMapObjGroup::Create+0x157, jne 75 08 (OnAntiportal)
+0x7D00BF CMapRenderChunk::SetVertexShader +0xB4   # CMapRenderChunk::SetVertexShader+0xB4, call GetPointLight -> jmp (OnLightLimitFix)
+0x791D6A CWorldScene::AddDoodadDefModelToModelScene +0xA2   # CWorldScene::AddDoodadDefModelToModelScene+0xA2, jb 0F 82 (OnLodObjectCull)
+0x9F3A88 vft:CGObject_C +0x30   # CGObject_C vtable slot 6 (ShouldFadeout), ponteiro de 8 bytes (SetFadeOutGameObjects)
+# --- x64-sites-CAMgr-InitHooks-TooltipScaling-AttachFixes (projects-2c)
+0x542679 CGSpellBook::AddKnownSpell +0x5CB   # CGSpellBook::AddKnownSpell+0x5CB, call DisplayError (SuppressLearnCalls)
+0x5427BE CGSpellBook::AddKnownSpell +0x69F   # CGSpellBook::AddKnownSpell+0x69F
+0x54284E CGSpellBook::AddKnownSpell +0x71B   # CGSpellBook::AddKnownSpell+0x71B
+0x6E7346 CGPlayer_C::DelKnownSpell +0x202   # CGPlayer_C::DelKnownSpell+0x202, call DisplayError unico (SuppressSupersedeCalls; 0x6E7356 fundido)
+0x6FD335 CGUnit_C::ComputeMissileTrajectory +0x7B1   # CGUnit_C::ComputeMissileTrajectory+0x7B1, byte 01 de mov [rsp+0x20],0x100111
+0x6FD4C7 CGUnit_C::ComputeMissileTrajectory +0xAB3   # CGUnit_C::ComputeMissileTrajectory+0xAB3, idem
+0x6FD59E CGUnit_C::ComputeMissileTrajectory +0xBCC   # CGUnit_C::ComputeMissileTrajectory+0xBCC, idem
+0x756458 CGUnit_C::HandleCombatAnimEvent +0x1A1   # CGUnit_C::HandleCombatAnimEvent+0x1A1, je 74 0F
+0x62B98F CGTooltip::SetItem +0x6D1   # CGTooltip::SetItem+0x6D1, if (stats->m_itemSet) je 74 5A (Patch62B98F)
+0x627980 CGTooltip::SetItem +0x20F   # CGTooltip::SetItem+0x20F, cmp [rdi+0x6C0],ecx; je -> xor r15d,r15d; jmp +0xB9 (Patch627980)
+0x6DC41D CGPlayer_C::CanUseItem +0x52   # CGPlayer_C::CanUseItem+0x52, jg 0F 8F F9 00 00 00 (teste de pilha; Detour6DC3F0)
+0x584FBE Script_GetMerchantItemInfo +0x1E3   # Script_GetMerchantItemInfo, retorno do call CanUseItem
+0x805DDD Spell_C_StartSpellCooldown +0x87   # Spell_C_StartSpellCooldown+0x87, jne 75 62 (-> EB 1E)
+0x805E2D Spell_C_StartSpellCooldown +0xD8   # Spell_C_StartSpellCooldown+0xD8, jbe 76 11
+0x744A55 CGObject_C::PostInit +0x1A   # CGObject_C::PostInit+0x1A, call [rax+0x1C8] -> mov eax,flag
+# (cliente novo: STATIC no fonte) 0x49DDBF @0x0B5A07   # Script_SetPoint+0x2E7, x: call aspect/mulss/divss/movaps/call NDCToDDCWidth (25 bytes) (AscSuperTrack PositionFrame)
+# (cliente novo: STATIC no fonte) 0x49DDE5 @0x0B5A36   # Script_SetPoint+0x316, y: idem
+0x820809 CM2SceneRender::DrawBatchProj +0xC1   # CM2SceneRender::DrawBatchProj+0xC1, x64 addss xmm0,[rip -> -2.0] / +8 addss xmm1,[rip -> 2.0] (AscUnitSelect PatchRadius)
+# (cliente novo: STATIC no fonte) 0x52B259 @0x3DD7D9   # CGGameUI::Idle: lea ecx,[rax-0x493E0] (ancora AFK; js +8, add eax +0xE, jns +0x13) -- REA 31/10
+# --- operario 31/10: AscAttachPatches (x64) -- RVA do out/WowClient64.exe atual, conferido no disasm 32/64
+0x7F29B9 DayNight::LoadMap +0x218   # DayNight::LoadMap +0x218: mov dword [rip+..] (g_planets.m_moon2.m_period), 0x3FD9999A -- C7 05 6E 1A 66 00 9A 99 D9 3F
+0x76A67A RegisterGxCVars +0xC6   # RegisterGxCVars +0xC6: cmovne rdi, rbp (gxWindow "1"/"0") -- 48 0F 45 FD
+0x8C51F0 BattlenetAssert +0x26   # BattlenetAssert +0x26: lea rax, [rip+..] "Internal Battle.net Error: %s" -- 48 8D 05 FB 98 26 00
+0xA944A4 str:"Internal Battle.net Error: %s"   # string "Internal Battle.net Error: %s" (.rdata)
+0x9FF5FC str:"    %s"   # string "    %s" (.rdata)
+# (cliente novo: STATIC no fonte) 0x605E13 @0x392127   # CGCamera::CollideCameraWithWorld +0xA7: mov r13d, 0x100171 (imm; o mov edx, 0x120171 fica em -14) -- 41 BD 71 01 10 00
+0xADAA88 =0xADAA80+0x10   # s_namePlates (0xADAA80) m_terminator.m_next: x86 +8, x64 +0x10 (TSList x64: m_linkoffset 8 + TSLink{prev, next})
+0x95EF4A CSimpleMovieFrame::Render +0x96   # retorno do call GxXformSetViewport (AscSceneTransform)
+0x74030E CGUnit_C::PostReenable +0x6F   # retorno do call qword [rax+0x38] = UpdateDisplayInfo (AscGeosets)
+0x68E4AD CGxDeviceD3d::DeviceSetBaseMipLevel +0x28   # tail-jmp p/ CGxDevice::DeviceSetBaseMipLevel (AscClientGuards)
+0x62BAC8 CollectItemSetData +0x14A   # AscInitHooks 6DE330: retorno do call GetVisibleItem (x86 inline em CGTooltip::SetItem)
+0x57ABE4 SpellParserParseText +0x43   # AscInitHooks 7FF070: retorno do call Spell_C_GetSpellLevel
+0x625231 CGTooltip::SetSpell +0x676   # retorno do call AddLine(0x3A6DE0) da descricao, apos SpellParserParseText (AscTooltipScaling Detour61FEC0)
+0x542D4E CGSpellBook::AddKnownSpell +0xB6D   # test r12,r12 / je (74 74) antes do bloco da barra de acao (AscAttachFixes SetCastJump)
+0x67BD40 DBCache<GameObjectStats_C,int,HASHKEY_INT>::GetRecord
+0x8066DA Spell_C_CancelCastingSpellByMovement +0x9B   # retorno do call Spell_C_CancelSpell (AscSpellMods Detour806200)
+0x4F8CF0 DrawSpellCursorShadow +0x1D4   # retorno do call ProjectTex::Render2d (AscSpellShadow Hook7E4370)
+0x725A8F CGUnit_C::RenderTargetSelection +0x11E   # retorno do 1o call ProjectTex::Render2d (AscSpellShadow Hook7E4370)
+0x587455 CGTradeInfo::HandleTradeMessage +0x10A   # retorno do call virtual IsDeadOrGhost [rdx+0x250] (AscAttachLate Hook6DAC10)

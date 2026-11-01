@@ -1,0 +1,95 @@
+diff --git a/src/Ascension/AscGlobalsB.cpp b/src/Ascension/AscGlobalsB.cpp
+index 9263730..b29a8b3 100644
+--- a/src/Ascension/AscGlobalsB.cpp
++++ b/src/Ascension/AscGlobalsB.cpp
+@@ -7,6 +7,7 @@
+ // pushes nil.
+ #include <Ascension/AscBindings.hpp>
+ #include <Ascension/AscX64.hpp>
++#include <Ascension/AscClientDbc.hpp>
+ #include <Ascension/AscDbc.hpp>
+ #include <Ascension/AscRuntime.hpp>
+ #include <Ascension/AscScript.hpp>
+@@ -321,8 +322,12 @@ namespace
+             special = *reinterpret_cast<uint32_t*>(rec + 0x11C + i * 4) == 0xA2;   // Effect[3], field 71
+         if (!special)
+         {
++#if ASC_X64
++            const uint32_t minId = AscClientDbc::MinId(kSkillLineAbilityDbc), maxId = AscClientDbc::MaxId(kSkillLineAbilityDbc);
++#else
+             const uint32_t minId = *reinterpret_cast<const uint32_t*>(kSkillLineAbilityDbc + 0x10);
+             const uint32_t maxId = *reinterpret_cast<const uint32_t*>(kSkillLineAbilityDbc + 0x0C);
++#endif
+             for (uint32_t id = minId; id <= maxId && !special; ++id)
+             {
+                 const uint8_t* sla = ClientDbcRow(kSkillLineAbilityDbc, id);
+diff --git a/src/Ascension/AscMisc.cpp b/src/Ascension/AscMisc.cpp
+index 28649d2..bc1a1a4 100644
+--- a/src/Ascension/AscMisc.cpp
++++ b/src/Ascension/AscMisc.cpp
+@@ -153,7 +153,7 @@ namespace
+ 
+     void SetCVarValue(void* cvar, const char* value, uint32_t last)   // FUN_10114c40 -> 0x7668C0
+     {
+-        const char* key = *reinterpret_cast<const char* const*>(reinterpret_cast<const uint8_t*>(cvar) + 0x14);
++        const char* key = *reinterpret_cast<const char* const*>(reinterpret_cast<const uint8_t*>(cvar) + ASC_OFF(0x14, 0x28));   // CVar m_key
+         if (strlen(value) + strlen(key) > 0xF9)
+             return;
+         reinterpret_cast<void(__thiscall*)(void*, const char*, int, int, int, int)>(ASC_PTR(0x7668C0))(cvar, value, 1, 0, 0, last);
+@@ -259,11 +259,18 @@ namespace
+     }
+ 
+     // handler_SetInteractDistance: writes straight into the client's interact-range table at 0xAC8A64.
++    // (0 duel, 1 player interact, 2 inspect, 3 follow -- squared distances, GameUI.cpp)
+     int SetInteractDistance(lua_State* L)
+     {
+         const int32_t idx = ToInt(CheckNumber(L, 1));
+         const float dist = static_cast<float>(CheckNumber(L, 2));
++#if ASC_X64
++        // as statics do x86 0xAC8A64.. so sao contiguas no x64 ate o idx 3 (follow); resolve slot a slot
++        if (float* slot = static_cast<float*>(ASC_PTR(0xAC8A64 + static_cast<uint32_t>(idx) * 4)))
++            *slot = dist;
++#else
+         reinterpret_cast<float*>(ASC_PTR(0xAC8A64))[idx] = dist;
++#endif
+         return 0;
+     }
+ 
+@@ -432,7 +439,7 @@ namespace
+ #endif
+         if (uint8_t* player = ActivePlayer())
+             reinterpret_cast<void(__cdecl*)(uintptr_t, int, const char*, intptr_t, intptr_t)>(ASC_PTR(0x7E6030))(
+-                *reinterpret_cast<const uint32_t*>(player + 0xB0), 5, text.c_str(), 0, 0);
++                *reinterpret_cast<const uintptr_t*>(player + ASC_OFF(0xB0, 0x130)), 5, text.c_str(), 0, 0);   // CGObject_C::m_nameDesc
+         return 0;
+     }
+ 
+diff --git a/src/Ascension/AscPatchData.cpp b/src/Ascension/AscPatchData.cpp
+index 8af76ec..dc5f90f 100644
+--- a/src/Ascension/AscPatchData.cpp
++++ b/src/Ascension/AscPatchData.cpp
+@@ -210,8 +210,9 @@ namespace
+     int __fastcall Hook713F50(uint8_t* go ASC_EDX_P(void* edx), uintptr_t model)
+     {
+         AscCrashContext::g_gameObjectEntry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(go + ASC_OFF(8, 0x10)) + 0xC);
+-        const uint8_t* shared = *reinterpret_cast<uint8_t* const*>(reinterpret_cast<const uint8_t*>(model) + 0x2C);
+-        AscCrashContext::g_gameObjectModel = shared ? reinterpret_cast<const char*>(shared + 0x3C) : "Unknown (Missing CM2Shared)";
++        // CM2Model::m_shared (x86 +0x2C, x64 +0x48) -> CM2Shared::m_fileName, char[] inline (x86 +0x3C, x64 +0x74).
++        const uint8_t* shared = model ? *reinterpret_cast<uint8_t* const*>(reinterpret_cast<const uint8_t*>(model) + ASC_OFF(0x2C, 0x48)) : nullptr;
++        AscCrashContext::g_gameObjectModel = shared ? reinterpret_cast<const char*>(shared + ASC_OFF(0x3C, 0x74)) : "Unknown (Missing CM2Shared)";
+         const int r = g_713F50(go ASC_EDX_A(edx), model);
+         RefreshGameObjectTexture(go);
+         return r;
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -58,6 +58,9 @@
+         // bytes); BuildCreator (z_stream natural x64), WildcardRolls e VanityCollection conferidos sem mudanca.
+         "AscBuildCreator", "AscWildcardRolls", "AscTemporalContracts", "AscVanityCollection", "AscLootLockout",
+         "AscLuaDbc",
++        // medicao 30/10 (projects-2c): nativas que voltaram nil + pacotes 0x66D/0x76F. GlobalsB (limites de DBC via
++        // AscClientDbc), Misc (m_nameDesc 8 bytes em +0x130, CVar m_key +0x28); D/E/F/Json/GameMode conferidos.
++        "AscGlobalsB", "AscGlobalsD", "AscGlobalsE", "AscGlobalsF", "AscJson", "AscMisc", "AscGameMode",
+         nullptr };
+ }
+ 

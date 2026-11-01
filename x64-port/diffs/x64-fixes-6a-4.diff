@@ -1,0 +1,189 @@
+diff --git a/src/Ascension/AscAlphaAmbience.cpp b/src/Ascension/AscAlphaAmbience.cpp
+index 9539bd2..72c7256 100644
+--- a/src/Ascension/AscAlphaAmbience.cpp
++++ b/src/Ascension/AscAlphaAmbience.cpp
+@@ -8,6 +8,7 @@
+ //     appears twice and the first one wins.
+ #include <Ascension/AscBindings.hpp>
+ #include <Ascension/AscClientDbc.hpp>
++#include <Ascension/AscX64.hpp>
+ #include <Ascension/AscClientOptions.hpp>
+ #include <cstdint>
+ #include <cstring>
+@@ -26,11 +27,21 @@ namespace
+     {
+         if (strcmp(value, "1") == 0)
+             for (const Ambience& a : kAlpha)
++            {
++#if ASC_X64
++                // Row devolve a copia-sombra no x64: escrever no registro real do cliente
++                if (uint32_t* day = AscClientDbc::Field(0xAD464C, a.id, 4))
++                    *day = a.day;
++                if (uint32_t* night = AscClientDbc::Field(0xAD464C, a.id, 8))
++                    *night = a.night;
++#else
+                 if (uint8_t* row = AscClientDbc::Row(0xAD464C, a.id))
+                 {
+                     *reinterpret_cast<uint32_t*>(row + 4) = a.day;
+                     *reinterpret_cast<uint32_t*>(row + 8) = a.night;
+                 }
++#endif
++            }
+         return 1;
+     }
+ 
+diff --git a/src/Ascension/AscAppearance.cpp b/src/Ascension/AscAppearance.cpp
+index bcd6aba..8098979 100644
+--- a/src/Ascension/AscAppearance.cpp
++++ b/src/Ascension/AscAppearance.cpp
+@@ -1934,7 +1934,7 @@ namespace
+ 
+     // 0x100C6410 (list 0x10BE2B6C, before 0x724820): with other players' appearances hidden (+0x1A5), a
+     // spell flagged SpellCustomAttr +0x14 & 0x2000000 is not applied to anyone but the player (FUN_10324a10).
+-    bool __cdecl BeforeAuraApply(void* unit, uint32_t, uint32_t rec)
++    bool __cdecl BeforeAuraApply(void* unit, uint32_t, uintptr_t rec)
+     {
+         if (reinterpret_cast<char(__thiscall*)(void*)>(ASC_PTR(0x4CEE50))(unit) || g.seeOthers)
+             return true;
+diff --git a/src/Ascension/AscAura137.cpp b/src/Ascension/AscAura137.cpp
+index 95afd9a..125e4c2 100644
+--- a/src/Ascension/AscAura137.cpp
++++ b/src/Ascension/AscAura137.cpp
+@@ -47,13 +47,13 @@ namespace
+         return false;
+     }
+ 
+-    bool __cdecl BeforeApply(void* unit, uint32_t, uint32_t rec)   // 0x10A4E2E0
++    bool __cdecl BeforeApply(void* unit, uint32_t, uintptr_t rec)   // 0x10A4E2E0
+     {
+         if (reinterpret_cast<char(__thiscall*)(void*)>(ASC_PTR(0x4CEE50))(unit) && HasAura137(reinterpret_cast<const uint8_t*>(rec)))
+             SetAura137Patch(true);
+         return true;
+     }
+-    bool __cdecl BeforeRemove(void* unit, uint32_t, uint32_t rec)   // 0x10A4E330
++    bool __cdecl BeforeRemove(void* unit, uint32_t, uintptr_t rec)   // 0x10A4E330
+     {
+         if (reinterpret_cast<char(__thiscall*)(void*)>(ASC_PTR(0x4CEE50))(unit) && HasAura137(reinterpret_cast<const uint8_t*>(rec)))
+             SetAura137Patch(false);
+diff --git a/src/Ascension/AscRuntime.cpp b/src/Ascension/AscRuntime.cpp
+index 31650a1..ae9c994 100644
+--- a/src/Ascension/AscRuntime.cpp
++++ b/src/Ascension/AscRuntime.cpp
+@@ -286,16 +286,16 @@ namespace
+     }
+     std::vector<std::pair<uint32_t, UnitSpellVeto>>& Before724820List() { static std::vector<std::pair<uint32_t, UnitSpellVeto>> v; return v; }
+     std::vector<std::pair<uint32_t, UnitSpellVeto>>& Before71E930List() { static std::vector<std::pair<uint32_t, UnitSpellVeto>> v; return v; }
+-    typedef int(__fastcall* FnUnitAB_t)(void* ASC_EDX_P(void*), uint32_t, uint32_t);
++    typedef int(__fastcall* FnUnitAB_t)(void* ASC_EDX_P(void*), uint32_t, uintptr_t);
+     FnUnitAB_t g_724820Trampoline = nullptr, g_71E930Trampoline = nullptr;
+-    int __fastcall Detour724820(void* unit ASC_EDX_P(void* edx), uint32_t a, uint32_t b)
++    int __fastcall Detour724820(void* unit ASC_EDX_P(void* edx), uint32_t a, uintptr_t b)
+     {
+         for (auto& cb : Before724820List())
+             if (!cb.second(unit, a, b))
+                 return 0;
+         return g_724820Trampoline(unit ASC_EDX_A(edx), a, b);
+     }
+-    int __fastcall Detour71E930(void* unit ASC_EDX_P(void* edx), uint32_t a, uint32_t b)
++    int __fastcall Detour71E930(void* unit ASC_EDX_P(void* edx), uint32_t a, uintptr_t b)
+     {
+         for (auto& cb : Before71E930List())
+             if (!cb.second(unit, a, b))
+diff --git a/src/Ascension/AscRuntime.hpp b/src/Ascension/AscRuntime.hpp
+index 33d2249..04d327f 100644
+--- a/src/Ascension/AscRuntime.hpp
++++ b/src/Ascension/AscRuntime.hpp
+@@ -119,7 +119,7 @@ namespace AscRuntime
+     //   FUN_10278620 -> list 0x10BE2B8C, the detour 0x10276090 over 0x71E930 (same shape);
+     //   FUN_102783D0 -> list 0x10BE2DD8, the detour 0x10277900 over 0x80B5D0 (__cdecl, 5 arguments,
+     //                   returns bool): the original first; only when it is true, callbacks (a..e).
+-    typedef bool (__cdecl* UnitSpellVeto)(void* unit, uint32_t a, uint32_t b);
++    typedef bool (__cdecl* UnitSpellVeto)(void* unit, uint32_t a, uintptr_t b);   // b = const SpellRec*
+     // `site` identifies the original registration call. The aura-removal and cast lists use the measured
+     // native unordered_set traversal. Other lists retain call-site ordering until fully measured.
+     void OnBefore724820(UnitSpellVeto cb, uint32_t site);
+diff --git a/src/Ascension/AscSpawnVisibility.cpp b/src/Ascension/AscSpawnVisibility.cpp
+index f52d593..10e3d4d 100644
+--- a/src/Ascension/AscSpawnVisibility.cpp
++++ b/src/Ascension/AscSpawnVisibility.cpp
+@@ -96,7 +96,7 @@ namespace
+     }
+ 
+     // 0x101A1FA0
+-    bool __cdecl BeforeAuraApply(void* object, uint32_t, uint32_t rec)
++    bool __cdecl BeforeAuraApply(void* object, uint32_t, uintptr_t rec)
+     {
+         if (*reinterpret_cast<const uint32_t*>(rec) != 0x16E59)
+             return true;
+diff --git a/src/Ascension/AscSpellMods.cpp b/src/Ascension/AscSpellMods.cpp
+index 3c2a856..dba57f2 100644
+--- a/src/Ascension/AscSpellMods.cpp
++++ b/src/Ascension/AscSpellMods.cpp
+@@ -160,13 +160,13 @@ namespace
+         return false;
+     }
+ 
+-    bool __cdecl AuraFlagOn(void*, uint32_t, uint32_t rec)   // 0x10325AA0, before 0x724820
++    bool __cdecl AuraFlagOn(void*, uint32_t, uintptr_t rec)   // 0x10325AA0, before 0x724820
+     {
+         if (IsAuraFlagSpell(reinterpret_cast<const uint8_t*>(rec)))
+             SetAuraFlag(true);
+         return true;
+     }
+-    bool __cdecl AuraFlagOff(void*, uint32_t, uint32_t rec)   // 0x10325B50, before 0x71E930
++    bool __cdecl AuraFlagOff(void*, uint32_t, uintptr_t rec)   // 0x10325B50, before 0x71E930
+     {
+         if (IsAuraFlagSpell(reinterpret_cast<const uint8_t*>(rec)))
+             SetAuraFlag(false);
+diff --git a/src/Ascension/AscSpellVisuals.cpp b/src/Ascension/AscSpellVisuals.cpp
+index d548992..7f44729 100644
+--- a/src/Ascension/AscSpellVisuals.cpp
++++ b/src/Ascension/AscSpellVisuals.cpp
+@@ -129,7 +129,7 @@ namespace
+         const uint8_t* desc = Descriptor(object);
+         if (DescGuid(desc, 0) == ActiveGuid())
+             return false;
+-        if (U32(object, 0x14) == 3 && (DescGuid(desc, 0x30) == ActiveGuid() || DescGuid(desc, 0x38) == ActiveGuid()))
++        if (U32(object, ASC_OFF(0x14, 0x24)) == 3 && (DescGuid(desc, 0x30) == ActiveGuid() || DescGuid(desc, 0x38) == ActiveGuid()))
+             return false;
+         return true;
+     }
+@@ -141,7 +141,7 @@ namespace
+         const uint8_t* attr = AscCA::SpellCustomAttrRow(spell);   // FUN_10324a10(spell, 8)
+         if (attr && (U32(attr, 0x14) & 8))
+         {
+-            const uint32_t type = U32(object, 0x14);
++            const uint32_t type = U32(object, ASC_OFF(0x14, 0x24));
+             if (type == 4 || type == 3)
+             {
+                 if (U32(Descriptor(object), 0x60) == 0)
+@@ -167,7 +167,7 @@ namespace
+     // 0x10323300 (list 0x10BE2B6C, before 0x724820): the spell record's first visual (+0x20C) follows the
+     // resolved visual (0 for -1, unchanged for 0 or an unknown row). Spell 0x31029 is refused for the player
+     // and for units summoned by the player.
+-    bool __cdecl BeforeAuraApply(void* unit, uint32_t, uint32_t recArg)
++    bool __cdecl BeforeAuraApply(void* unit, uint32_t, uintptr_t recArg)
+     {
+         uint8_t* rec = reinterpret_cast<uint8_t*>(recArg);
+         const uint8_t* desc = Descriptor(unit);
+@@ -201,12 +201,17 @@ namespace
+ 
+     uint32_t __fastcall Detour720F80(void* object ASC_EDX_P(void* edx), const uint32_t* spellRec, uint8_t* out, uint32_t c, uint32_t d)   // 0x10322B50
+     {
+-        if (reinterpret_cast<uintptr_t>(_ReturnAddress()) == 0x80ED4E && object != reinterpret_cast<void*(__cdecl*)()>(ASC_PTR(0x4038F0))()
+-            && U32(object, 0x14) == 4 && OptionOn() && !IsHelpful(reinterpret_cast<const uint8_t*>(spellRec)))
++#if ASC_X64
++        // OnSpellGo: retorno do `call r10` (vtable +0x178) em PendingSpellCast::OnSpellGo+0xCB1 (extra-addr)
++        if (_ReturnAddress() == ASC_PTR(0x80ED4E) && object
++#else
++        if (reinterpret_cast<uintptr_t>(_ReturnAddress()) == 0x80ED4E && object
++#endif != reinterpret_cast<void*(__cdecl*)()>(ASC_PTR(0x4038F0))()
++            && U32(object, ASC_OFF(0x14, 0x24)) == 4 && OptionOn() && !IsHelpful(reinterpret_cast<const uint8_t*>(spellRec)))
+             return 0;
+         const uint32_t r = g_720F80(object ASC_EDX_A(edx), spellRec, out, c, d);
+         const uint8_t* desc = Descriptor(object);
+-        const uint32_t visual = ResolveVisual(U32(object, 0x14), U32(desc, 0), U32(desc, 4), spellRec[0]);
++        const uint32_t visual = ResolveVisual(U32(object, ASC_OFF(0x14, 0x24)), U32(desc, 0), U32(desc, 4), spellRec[0]);
+         if (visual == 0)
+             return r;
+         uint8_t zero[0x80];

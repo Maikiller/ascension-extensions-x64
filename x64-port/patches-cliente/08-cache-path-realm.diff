@@ -1,0 +1,29 @@
+diff --git a/WoW/Source/DB/DBClient/DBCache.cpp b/WoW/Source/DB/DBClient/DBCache.cpp
+index 37a6bf9..2207f60 100644
+--- a/WoW/Source/DB/DBClient/DBCache.cpp
++++ b/WoW/Source/DB/DBClient/DBCache.cpp
+@@ -4,6 +4,10 @@
+ #include "Engine/Source/Storm/H/storm.h"
+ #include "WoW/Source/Client.h"
+ #include "WoW/Source/Game/GameClient/WardenClient.h"
++#if defined(_WIN64)
++#include "Engine/Source/ConsoleBase/ConsoleVar.h"
++#include "WoW/Source/WowSvcs/WowSvcsClient/ClientServices.h"
++#endif
+ 
+ // INLINED
+ HASHKEY_INT::HASHKEY_INT() {
+@@ -97,7 +101,13 @@ uint32_t CWardenKey::Hash() const {
+ // OFFSET: 0x00667EF0
+ void GetCacheDirectory(char* path) {
+     if (CheckDataFilesExist()) {
++#if defined(_WIN64)
++        // CoA: Extensions.dll (CachePathHook em 0x667EF9) -> "Cache/WDB/<locale>/<reino>".
++        const char* realm = ClientServices::s_realmNameVar ? ClientServices::s_realmNameVar->m_stringValue.m_str : nullptr;
++        SStrPrintf(path, 260, "Cache/%s/%s/%s", "WDB", s_localeCode, realm ? realm : "");
++#else
+         SStrPrintf(path, 260, "Cache/%s/%s", "WDB", s_localeCode);
++#endif
+         OsCreateDirectory(path, 1);
+     } else {
+         SStrCopy(path, "WDB", 260);

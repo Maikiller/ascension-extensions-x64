@@ -1,0 +1,2 @@
+0x49DDBF @0x0B5A07   # Script_SetPoint+0x2E7, x: call aspect/mulss/divss/movaps/call NDCToDDCWidth (25 bytes) (AscSuperTrack PositionFrame)
+0x49DDE5 @0x0B5A36   # Script_SetPoint+0x316, y: idem

@@ -1,0 +1,58 @@
+# (b) operandos x64 -- sites de out/operands-x64-parcial.md (x86 -> RVA x64), bytes stock x64 no comentario
+0x464C4F @0x5841FA   # HandleCharEnum, 80 7C 24 70 0A
+0x5663D4 @0x438AB0   # SetMacroBody, 81 FB 00 01 00 00
+0x56E499 @0x4DE01A   # Script_CheckInbox, 05 60 EA 00 00
+0x574A5F @0x4ED997   # Script_ConvertToRaid, 83 B8 C0 00 00 00 0A
+0x611717 @0x40C215   # Script_GetComboPoints, 80 F9 0B 75 36
+0x7FF2A5 @0x298A17   # SpellRec, 81 C3 F4 01 00 00
+0x5AE56B @0x48ACDE   # GetNextFreeSetID, 83 FB 0A
+0x5AF142 @0x4D1BBF   # Script_GetEquipmentSetInfo, 83 F8 09
+0x5AF485 @0x48A8E6   # CanCreateSet, 83 FB 0A
+0x5AF548 @0x48B430   # SMSG_EQUIPMENT_SET_LIST, 41 83 FE 0A
+0x5AF809 @0x48AA16   # CreateEquipmentSet, 83 FB 0A
+0x5AFB64 @0x4D21CA   # Script_SaveEquipmentSet, 41 B8 0A 00 00 00
+0x632163 @0x2B5270   # GetNetStats, 83 FA 10
+0x63264A @0x2B57D2   # HandlePong, 83 F8 10
+0x63266A @0x2B57F2   # HandlePong, 83 F8 10
+0x632DE5 @0x2B570E   # HandleIdle, BA D0 8A FF FF
+0x54CFD4 @0x44A5E5   # RequestPlayerPositions, 8D 83 88 13 00 00
+0x4910DB @0x0A5F8C   # SetFrameLevel, BA 80 00 00 00
+0x802221 @0x741A42   # Script_CancelItemTempEnchantment, 77 3F
+0x59DC63 @0x4B7D87   # Script_PlaceAuctionBid, 74 24
+0x5A5163 @0x452039   # GuildBank SwapItems, 74 16
+0x5A522F @0x4520DD   # GuildBank SwapItems, 75 14
+0x5A52E4 @0x45217E   # GuildBank SwapItems, 75 0F
+0x5A5472 @0x451D4B   # GuildBank SwapBankItems, 75 0F
+0x5A6506 @0x4D4219   # Script_AutoStoreGuildBankItem, 75 0F
+0x5A6956 @0x4D46A0   # Script_GetGuildBankTabInfo, 74 0F
+0x5AC94D @0x49EF8E   # CGGMTicketInfo, 0F 84 25 02 00 00
+0x5CF2F6 @0x4E7A57   # Script_OfferPetition, 75 0F
+0x5AD0B0 @0x4D2CF3   # Script_NewGMTicket, 85 C0 74 4E
+0x5D6E9C @0x42FFAF   # SendRequestPetInfo, 75 07
+0x52ABD9 @0x3DDCF1   # InitializeFrameXML, 8B C8
+0x52ADCC @0x3DDE51   # InitializeFrameXML, E8 FA B3 05 00
+0x4E4BC2 @0x28BF32   # CGlueMgr, 0F 82 8D 02 00 00
+0x4E57FE @0x28B12F   # CGlueMgr, 72 5B
+0x707BA3 @0x2F58D8   # OnUpdateDurability, 7E 3C
+0x707BE2 @0x2F5869   # OnUpdateDurability, E8 12 86 03 00
+0x708328 @0x2F29BA   # CGItem_C, 0F 85 86 03 00 00
+0x634B07 @0x24665E   # InitResistances, 76 17
+0x74135D @0x2C782B   # CGUnit_C, 74 73
+0x57E9A8 @0x43D265   # CGMinimapFrame, 0F B6 49 45
+0x57EB27 @0x43D539   # GetTrackingTypeInfo, 41 B8 01 00 00 00 0F B6 49 45 41 D3 E0
+0x731480 @0x2D980E   # CGUnit_C, 7D 17
+0x70ED92 @0x303411   # CGGameObject_C, 75 2E
+0x71C2C0 @0x2CB240   # CGUnit_C, 48 8B 05 21 79 85 00 83 78 54 00 74 07 8B 81 1C 18 00 00 C3
+0x783310 @0x52A88F   # CWorld, 76 57
+0x819A74 @0x0C695B   # Script_debuglocals, 75 07
+0x634E28 @0x246156   # ClientDBInitialize, C7 05 A8 B4 7C 00 01 00 00 00
+0x5CBA74 @0x46A572   # Packet_MSG_GUILD_PERMISSIONS, 88 05 BC DF 6C 00
+0x81C9A8 @0x13FE49   # CM2Scene, 33 D2
+0x81C9D9 @0x13C9DF   # CM2Scene, 33 D2
+0x5FD886 @0x3BADC0   # ValidateCameraLinearSpeed, 72 07
+0x517EE8 @0x3E254D   # PlacedFrameCallback, 45 8B
+0x5184E1 @0x3DF64D   # LoadPlacedFrames, 48 8D
+# sites de modulo (AscClientOptions)
+0x720020 @0x2C04E8   # ChatBubbleShow, 0F 85 3C 01 00 00
+0x725737 @0x2D42D8   # NamePlateAddOrUpdate, 74
+0x73D46A @0x2D617A   # OnCollideFallLand, 7E

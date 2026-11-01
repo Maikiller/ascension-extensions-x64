@@ -1,0 +1,113 @@
+diff --git a/src/Ascension/AscEventPackets.cpp b/src/Ascension/AscEventPackets.cpp
+index 159f9ee..7c6ded3 100644
+--- a/src/Ascension/AscEventPackets.cpp
++++ b/src/Ascension/AscEventPackets.cpp
+@@ -86,7 +86,7 @@ namespace
+     {
+         const uint32_t n = U32(p);
+         for (uint32_t i = 0; i < n; ++i)
+-            if (!reinterpret_cast<StockHandler>(handler)(a, opcode, time, p))
++            if (!reinterpret_cast<StockHandler>(ASC_PTR(handler))(a, opcode, time, p))
+                 return 0;
+         return 1;
+     }
+@@ -241,7 +241,7 @@ namespace
+                         return 1;
+                     float a[3], b[3];
+                     typedef void(__thiscall* Pos_t)(void*, float*);
+-                    (*reinterpret_cast<Pos_t*>(*reinterpret_cast<uint8_t**>(src) + 0x2C))(src, a);
++                    (*reinterpret_cast<Pos_t*>(*reinterpret_cast<uint8_t**>(src) + ASC_OFF(0x2C, 0x58)))(src, a);
+                     (*reinterpret_cast<Pos_t*>(*reinterpret_cast<uint8_t**>(me) + ASC_OFF(0x2C, 0x58)))(me, b);
+                     const float dx = b[0] - a[0], dy = b[1] - a[1];
+                     if (!(r * r >= dy * dy + dx * dx))
+@@ -346,7 +346,7 @@ namespace
+     // FUN_10114c40 (thiscall on the CVar): the client's CVar set 0x7668C0, after the original's length assert.
+     void SetCVar(CVar* cvar, const char* value, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
+     {
+-        const char* key = *reinterpret_cast<const char* const*>(reinterpret_cast<const uint8_t*>(cvar) + 0x14);
++        const char* key = *reinterpret_cast<const char* const*>(reinterpret_cast<const uint8_t*>(cvar) + ASC_OFF(0x14, 0x28));
+         if (strlen(value) + strlen(key) > 0xF9)
+         {
+             const std::string msg = std::string("CVar::Set (m_key.str + value) > 249, m_key = ") + key;
+diff --git a/src/Ascension/AscHotPatch.cpp b/src/Ascension/AscHotPatch.cpp
+index 68adda9..459313d 100644
+--- a/src/Ascension/AscHotPatch.cpp
++++ b/src/Ascension/AscHotPatch.cpp
+@@ -156,6 +156,11 @@ namespace
+     const char* Taint() { return *reinterpret_cast<const char* const*>(ASC_PTR(0xD4139C)); }
+     void SetTaint(const char* name)
+     {
++#if ASC_X64
++        // x64: global de dados (char* de 8 bytes) numa pagina RW -- escrita direta.
++        *reinterpret_cast<const char**>(ASC_PTR(0xD4139C)) = name;
++        return;
++#endif
+         DWORD old;
+         const BOOL ok = VirtualProtect(reinterpret_cast<void*>(ASC_PTR(0xD4139C)), 4, PAGE_EXECUTE_READWRITE, &old);
+         *reinterpret_cast<const char**>(ASC_PTR(0xD4139C)) = name;
+diff --git a/src/Ascension/AscPacketApi.cpp b/src/Ascension/AscPacketApi.cpp
+index 8218ee4..0d828d8 100644
+--- a/src/Ascension/AscPacketApi.cpp
++++ b/src/Ascension/AscPacketApi.cpp
+@@ -45,7 +45,7 @@ namespace
+     // or leave nil in its place when "CDataStore" is not in the registry.
+     void PushPacket(lua_State* L, CDataStore* store)
+     {
+-        *static_cast<CDataStore**>(lua_newuserdata(L, 4)) = store;
++        *static_cast<CDataStore**>(lua_newuserdata(L, ASC_OFF(4, 8))) = store;   // um CDataStore*
+         AscLua::lua_pushstring(L, "CDataStore");
+         lua_rawget(L, kRegistry);
+         if (AscLua::lua_type(L, -1) == LUA_TTABLE)
+diff --git a/src/Ascension/AscRaidVideo.cpp b/src/Ascension/AscRaidVideo.cpp
+index 34541d9..b0da034 100644
+--- a/src/Ascension/AscRaidVideo.cpp
++++ b/src/Ascension/AscRaidVideo.cpp
+@@ -51,15 +51,15 @@ namespace
+     const uint8_t* Base(size_t i)
+     {
+         if (kSettings[i].clientPtr)
+-            return *reinterpret_cast<const uint8_t* const*>(kSettings[i].clientPtr);   // FUN_10114490
++            return *reinterpret_cast<const uint8_t* const*>(ASC_PTR(kSettings[i].clientPtr));   // FUN_10114490
+         return reinterpret_cast<const uint8_t*>(CVar::Lookup(kSettings[i].base));
+     }
+-    const char* Str(const uint8_t* cvar) { return AscClientDbc::Str(cvar, 0x28); }
++    const char* Str(const uint8_t* cvar) { return AscClientDbc::Str(cvar, ASC_OFF(0x28, 0x48)); }   // CVar m_stringValue
+ 
+     // FUN_10114c40: the length assert, then the client's CVar::Set 0x7668C0(value, 1, 0, 0, 0).
+     void Set(const uint8_t* cvar, const char* value)
+     {
+-        const char* key = AscClientDbc::Str(cvar, 0x14);
++        const char* key = AscClientDbc::Str(cvar, ASC_OFF(0x14, 0x28));   // CVar m_key
+         if (strlen(value) + strlen(key) > 0xF9)
+             return;
+         reinterpret_cast<void(__thiscall*)(const void*, const char*, int, int, int, int)>(ASC_PTR(0x7668C0))(cvar, value, 1, 0, 0, 0);
+@@ -68,7 +68,7 @@ namespace
+     bool Enabled()
+     {
+         const CVar* use = CVar::Lookup("useRaidVideoSettings");   // 0x10BE3884
+-        return !use || *reinterpret_cast<const int32_t*>(reinterpret_cast<const uint8_t*>(use) + 0x30) != 0;
++        return !use || *reinterpret_cast<const int32_t*>(reinterpret_cast<const uint8_t*>(use) + ASC_OFF(0x30, 0x54)) != 0;
+     }
+     bool InRaidMap()
+     {
+@@ -116,7 +116,7 @@ namespace
+     {
+         if (!Enabled() || !HaveMap() || !InRaidMap())
+             return 1;
+-        std::string name = *reinterpret_cast<const char* const*>(reinterpret_cast<const uint8_t*>(cvar) + 0x14);
++        std::string name = *reinterpret_cast<const char* const*>(reinterpret_cast<const uint8_t*>(cvar) + ASC_OFF(0x14, 0x28));
+         const size_t at = name.size() >= 5 ? name.find("_raid") : std::string::npos;
+         if (at == std::string::npos)
+         {
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -46,6 +46,8 @@
+         "AscExtraActionButton",
+         // lote 3 (30/10, projects-2c) g1: Lua sobre DBC/DBCache do cliente (ASC_PTR/AscClientDbc conferidos).
+         "AscWorldMap", "AscAssetQuery", "AscCanToggle",
++        // g2: pacotes custom/Lua (CDataStore x64 conferido; CVar m_key +0x28, m_stringValue +0x48, int +0x54).
++        "AscPacketApi", "AscHotPatch", "AscEventPackets", "AscRaidVideo",
+         nullptr };
+ }
+ 

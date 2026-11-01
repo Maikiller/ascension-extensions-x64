@@ -1,0 +1,37 @@
+diff --git a/Engine/Source/Frame/CScriptRegion_Scripts.cpp b/Engine/Source/Frame/CScriptRegion_Scripts.cpp
+index a805394..8c7f254 100644
+--- a/Engine/Source/Frame/CScriptRegion_Scripts.cpp
++++ b/Engine/Source/Frame/CScriptRegion_Scripts.cpp
+@@ -459,6 +459,12 @@ static int32_t Script_GetPoint(lua_State* L) {
+     return 5;
+ }
+ 
++#if defined(_WIN64)
++// CoA: x86 = NOP de 0x1C bytes em 0x49DDBF e 0x1F em 0x49DDE5 (calculo x87 inline). 1 = offsets crus.
++// STATIC: 0x0049DDBF
++int32_t g_coaSetPointRawOffsets = 0;
++#endif
++
+ // VERIFY: bfe26544 auto
+ // OFFSET: 0x0049DB10
+ static int32_t Script_SetPoint(lua_State* L) {
+@@ -534,9 +540,19 @@ static int32_t Script_SetPoint(lua_State* L) {
+ 
+     if (lua_isnumber(L, argIndex) && lua_isnumber(L, argIndex + 1)) {
+         offsetX = lua_tonumber(L, argIndex);
++#if defined(_WIN64)
++        offsetY = lua_tonumber(L, argIndex + 1);
++
++        // CoA: PositionFrame do Extensions.dll (AscSuperTrack) liga/desliga a conversao NDC->DDC dos offsets.
++        if (!g_coaSetPointRawOffsets) {
++            offsetX = NDCToDDCWidth(offsetX / (CoordinateGetAspectCompensation() * 1024.0f));
++            offsetY = NDCToDDCWidth(offsetY / (CoordinateGetAspectCompensation() * 1024.0f));
++        }
++#else
+         offsetX = NDCToDDCWidth(offsetX / (CoordinateGetAspectCompensation() * 1024.0f));
+         offsetY = lua_tonumber(L, argIndex + 1);
+         offsetY = NDCToDDCWidth(offsetY / (CoordinateGetAspectCompensation() * 1024.0f));
++#endif
+     } else {
+         offsetY = 0.0f;
+     }

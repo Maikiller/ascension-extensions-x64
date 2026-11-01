@@ -1,0 +1,95 @@
+diff --git a/WoW/Source/UIUtil/PortraitButton.cpp b/WoW/Source/UIUtil/PortraitButton.cpp
+index b932ed9..2f5c5a5 100644
+--- a/WoW/Source/UIUtil/PortraitButton.cpp
++++ b/WoW/Source/UIUtil/PortraitButton.cpp
+@@ -334,13 +334,26 @@ static int32_t QueuePortraitUpdate(CGUnit_C* unit, uint32_t flags) {
+     return 1;
+ }
+ 
++#if defined(_WIN64)
++// CoA: SetMaskTexture/ClearMaskTexture do Extensions.dll (x86: imm em 0x6194ED/0x617721/0x61779F/0x619546/0x619548,
++// nomes em 0x61773A/0x6177A6/0x6177B2, 0x61935B je->jmp e 0x61770A jne->NOP). Tamanho 0 = original.
++// STATIC: 0x006194ED
++int32_t g_coaPortraitMaskSize = 0;
++// STATIC: 0x0061773A
++const char* g_coaPortraitMaskPath = nullptr;
++#endif
++
+ // VERIFY: 0ce6a9ac manual
+ // OFFSET: 0x006176A0
+ static TSFixedArray<uint8_t>* GetAlphaMask(uint32_t size) {
+     static TSFixedArray<uint8_t> s_alphaMasks[2];
+     TSFixedArray<uint8_t>* mask = &s_alphaMasks[size == 64];
+ 
++#if defined(_WIN64)
++    if (mask->m_count && !g_coaPortraitMaskSize) {
++#else
+     if (mask->m_count) {
++#endif
+         return mask;
+     }
+ 
+@@ -349,7 +362,13 @@ static TSFixedArray<uint8_t>* GetAlphaMask(uint32_t size) {
+     CTgaFile tga;
+     const char* tgaName = nullptr;
+ 
++#if defined(_WIN64)
++    if (g_coaPortraitMaskSize && g_coaPortraitMaskPath) {
++        tgaName = g_coaPortraitMaskPath;
++    } else if (size == 128) {
++#else
+     if (size == 128) {
++#endif
+         tgaName = "Interface\\CharacterFrame\\TempPortraitAlphaMask.tga";
+     } else if (size == 64) {
+         tgaName = "Interface\\CharacterFrame\\TempPortraitAlphaMaskSmall.tga";
+@@ -364,7 +383,13 @@ static TSFixedArray<uint8_t>* GetAlphaMask(uint32_t size) {
+     CBLPFile blp;
+     const char* blpName = nullptr;
+ 
++#if defined(_WIN64)
++    if (g_coaPortraitMaskSize && g_coaPortraitMaskPath) {
++        blpName = g_coaPortraitMaskPath;
++    } else if (size == 128) {
++#else
+     if (size == 128) {
++#endif
+         blpName = "Interface\\CharacterFrame\\TempPortraitAlphaMask.blp";
+     } else if (size == 64) {
+         blpName = "Interface\\CharacterFrame\\TempPortraitAlphaMaskSmall.blp";
+@@ -468,7 +493,11 @@ void SetPortraitTexture(CSimpleTexture* texture, const char* fileName) {
+ 
+     ITEMPORTRAIT* portrait = s_itemPortraits.Ptr(fileName);
+ 
++#if defined(_WIN64)
++    if (portrait && !g_coaPortraitMaskSize) {
++#else
+     if (portrait) {
++#endif
+         texture->SetTexture(portrait->m_texture);
+         return;
+     }
+@@ -494,14 +523,23 @@ void SetPortraitTexture(CSimpleTexture* texture, const char* fileName) {
+ 
+         blp.Unlock(0);
+         blp.Close();
++#if defined(_WIN64)
++        const uint32_t maskSize = g_coaPortraitMaskSize ? g_coaPortraitMaskSize : 64;
++        TSFixedArray<uint8_t>* mask = GetAlphaMask(maskSize);
++#else
+         TSFixedArray<uint8_t>* mask = GetAlphaMask(64);
++#endif
+ 
+         for (uint32_t i = 0; i < portrait->m_texels.Count(); i++) {
+             portrait->m_texels.m_data[i].a = mask->m_data[i];
+         }
+ 
+         CGxTexFlags flags(GxTex_Linear, 0, 0, 0, 0, 0, 1);
++#if defined(_WIN64)
++        CTexture* portraitTexture = TextureCreate(maskSize, maskSize, GxTex_Argb8888, GxTex_Argb8888, flags, &portrait->m_texels, TextureUpdate, "Portrait2", 0);
++#else
+         CTexture* portraitTexture = TextureCreate(64, 64, GxTex_Argb8888, GxTex_Argb8888, flags, &portrait->m_texels, TextureUpdate, "Portrait2", 0);
++#endif
+         texture->SetTexture(portraitTexture);
+         portrait->m_texture = portraitTexture;
+     }

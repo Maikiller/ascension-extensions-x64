@@ -1,0 +1,66 @@
+diff --git a/WoW/Source/WorldClient/World.cpp b/WoW/Source/WorldClient/World.cpp
+index 5de09de..5ad08b1 100644
+--- a/WoW/Source/WorldClient/World.cpp
++++ b/WoW/Source/WorldClient/World.cpp
+@@ -503,6 +503,16 @@ void World::SetLoadProgressCallback(CALLBACK_FUNC callback, void* param) {
+     World::s_loadProgressParam = param;
+ }
+ 
++#if defined(_WIN64)
++// CoA: ganchos do ZoneLightData (Extensions.dll). Ponteiros nulos = original.
++// STATIC: 0x00781426
++void (*g_coaZonesInitialize)() = nullptr;
++// STATIC: 0x00781751
++void (*g_coaFindAndAddZoneLight)(const C3Vector* position) = nullptr;
++// STATIC: 0x00781730
++int32_t g_coaFogModeMinMap = 530;
++#endif
++
+ // VERIFY: e5c4a380 manual
+ // OFFSET: 0x0077ED40
+ static void ZonesInitialize() {
+@@ -1405,7 +1415,11 @@ void DayNight::Update(int32_t reset, const C3Vector* cameraPos) {
+     DNInfo* info = DayNight::GetInfo();
+     int32_t fogMode = static_cast<uint32_t>(g_theGxDevicePtr->Caps().m_shaderTargets[0]) > 1;
+ 
++#if defined(_WIN64)
++    if (s_mapId < g_coaFogModeMinMap) {   // CoA: 0x781730 (ZoneLightData grava -1)
++#else
+     if (s_mapId < 530) {
++#endif
+         fogMode = 0;
+     }
+ 
+@@ -1413,7 +1427,15 @@ void DayNight::Update(int32_t reset, const C3Vector* cameraPos) {
+     info->ClearZoneLights();
+ 
+     if (cameraPos) {
++#if defined(_WIN64)
++        if (g_coaFindAndAddZoneLight) {   // CoA: FindAndAddZoneLightEx (0x781751)
++            g_coaFindAndAddZoneLight(cameraPos);
++        } else {
++            DayNight::FindAndAddZoneLight(cameraPos);
++        }
++#else
+         DayNight::FindAndAddZoneLight(cameraPos);
++#endif
+     }
+ 
+     if (reset) {
+@@ -1754,7 +1776,16 @@ void CWorld::Initialize() {
+     ConsoleCommandRegister("detailDoodadAlpha", CWorld::ConsoleCommand_DetailDoodadAlpha, CATEGORY_GRAPHICS, nullptr);
+     ConsoleCommandRegister("characterAmbient", CWorld::ConsoleCommand_CharacterAmbient, CATEGORY_GRAPHICS, nullptr);
+ 
++#if defined(_WIN64)
++    // CoA: ZoneLightData do Extensions.dll (FillZoneLightData no lugar de ZonesInitialize, 0x781426).
++    if (g_coaZonesInitialize) {
++        g_coaZonesInitialize();
++    } else {
++        ZonesInitialize();
++    }
++#else
+     ZonesInitialize();
++#endif
+ }
+ 
+ // VERIFY: e7c98865 auto

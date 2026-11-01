@@ -1,0 +1,371 @@
+diff --git a/src/Ascension/AscAddonTaint.cpp b/src/Ascension/AscAddonTaint.cpp
+index 0ba63fa..f94b26a 100644
+--- a/src/Ascension/AscAddonTaint.cpp
++++ b/src/Ascension/AscAddonTaint.cpp
+@@ -78,7 +78,10 @@ namespace
+         }
+     }
+ #else
+-    int Original488540(void*) { AscX64::Unported("Original488540"); return {}; }
++    // x64: o trampolim do MinHook (AscRuntime::Detour) faz o papel do prologo refeito a mao.
++    typedef bool (*Fn488540_t)(void*);   // CScriptRegion::ProtectedFunctionsAllowed (__thiscall, bool)
++    Fn488540_t g_488540 = nullptr;
++    int Original488540(void* self) { return g_488540(self) ? 1 : 0; }
+ #endif
+ #if !ASC_X64
+     __declspec(naked) int __cdecl Original510430(uint32_t)
+@@ -94,7 +97,8 @@ namespace
+         }
+     }
+ #else
+-    int Original510430(uintptr_t) { AscX64::Unported("Original510430"); return {}; }
++    int (*g_510430)(uintptr_t) = nullptr;   // int(lua_State*), trampolim do MinHook
++    int Original510430(uintptr_t L) { return g_510430(L); }
+ #endif
+ #if !ASC_X64
+     __declspec(naked) int __cdecl Original510450(uint32_t)
+@@ -110,7 +114,8 @@ namespace
+         }
+     }
+ #else
+-    int Original510450(uintptr_t) { AscX64::Unported("Original510450"); return {}; }
++    int (*g_510450)(uintptr_t) = nullptr;   // int(lua_State*), trampolim do MinHook
++    int Original510450(uintptr_t L) { return g_510450(L); }
+ #endif
+ #if !ASC_X64
+     __declspec(naked) int __cdecl Original510A00(uint32_t)
+@@ -125,7 +130,8 @@ namespace
+         }
+     }
+ #else
+-    int Original510A00(uintptr_t) { AscX64::Unported("Original510A00"); return {}; }
++    int (*g_510A00)(uintptr_t) = nullptr;   // int(lua_State*), trampolim do MinHook
++    int Original510A00(uintptr_t L) { return g_510A00(L); }
+ #endif
+ 
+     int __cdecl Hook5191C0(uint32_t action)   // FUN_103115b0
+@@ -211,15 +217,31 @@ namespace
+         AscRuntime::OnBeforeTargetChange(BeforeTargetChange);
+         AscRuntime::OnAfterTargetChange(AfterTargetChange);
+         g_816DA0 = Hook<FnL_t>(0x816DA0, 10, reinterpret_cast<void*>(&Hook816DA0));   // hooked 0x816DA0
++#if ASC_X64
++        g_510430 = Hook<int (*)(uintptr_t)>(0x510430, 0, reinterpret_cast<void*>(&Hook510430));
++#else
+         AscRuntime::ReplaceFunction(0x510430, reinterpret_cast<void*>(&Hook510430));
++#endif
+         g_51AC90 = Hook<Fn0_t>(0x51AC90, 7, reinterpret_cast<void*>(&Hook51AC90));   // hooked 0x51AC90
+         g_51A7A0 = Hook<Fn1_t>(0x51A7A0, 9, reinterpret_cast<void*>(&Hook51A7A0));   // hooked 0x51A7A0
+         g_527F00 = Hook<Fn1_t>(0x527F00, 7, reinterpret_cast<void*>(&Hook527F00));   // hooked 0x527F00
+         g_52B470 = Hook<Fn1_t>(0x52B470, 10, reinterpret_cast<void*>(&Hook52B470));   // hooked 0x52B470
+         g_52B4E0 = Hook<Fn1_t>(0x52B4E0, 10, reinterpret_cast<void*>(&Hook52B4E0));   // hooked 0x52B4E0
++#if ASC_X64
++        g_510450 = Hook<int (*)(uintptr_t)>(0x510450, 0, reinterpret_cast<void*>(&Hook510450));
++#else
+         AscRuntime::ReplaceFunction(0x510450, reinterpret_cast<void*>(&Hook510450));
++#endif
++#if ASC_X64
++        g_510A00 = Hook<int (*)(uintptr_t)>(0x510A00, 0, reinterpret_cast<void*>(&Hook510A00));
++#else
+         AscRuntime::ReplaceFunction(0x510A00, reinterpret_cast<void*>(&Hook510A00));
++#endif
++#if ASC_X64
++        g_488540 = Hook<Fn488540_t>(0x488540, 0, reinterpret_cast<void*>(&Hook488540));
++#else
+         AscRuntime::ReplaceFunction(0x488540, reinterpret_cast<void*>(&Hook488540));
++#endif
+         g_49F210 = Hook<Fn1_t>(0x49F210, 8, reinterpret_cast<void*>(&Hook49F210));   // hooked 0x49F210
+         g_51FF20 = Hook<Fn2_t>(0x51FF20, 8, reinterpret_cast<void*>(&Hook51FF20));   // hooked 0x51FF20
+         g_5252D0 = Hook<Fn3_t>(0x5252D0, 9, reinterpret_cast<void*>(&Hook5252D0));   // hooked 0x5252D0
+diff --git a/src/Ascension/AscAttachLate.cpp b/src/Ascension/AscAttachLate.cpp
+index 89477fa..56e18d5 100644
+--- a/src/Ascension/AscAttachLate.cpp
++++ b/src/Ascension/AscAttachLate.cpp
+@@ -64,7 +64,9 @@ namespace
+         }
+     }
+ #else
+-    int Original52ED60(uintptr_t) { AscX64::Unported("Original52ED60"); return {}; }
++    // x64: trampolim do MinHook no lugar do prologo refeito a mao. int Script_GetBarberShopTotalCost(lua_State*)
++    int (*g_52ED60)(uintptr_t) = nullptr;
++    int Original52ED60(uintptr_t L) { return g_52ED60(L); }
+ #endif
+     int __cdecl Hook52ED60(uintptr_t a)   // 0x10A6EB60
+     {
+@@ -171,7 +173,11 @@ namespace
+         for (const BytePatch& p : kBytePatches)
+             WriteBytes(p.address, p.bytes, p.size);
+         AscRuntime::ReplaceFunction(0x4DE450, reinterpret_cast<void*>(&Replace4DE450));
++#if ASC_X64
++        g_52ED60 = reinterpret_cast<int (*)(uintptr_t)>(AscRuntime::Detour(0x52ED60, 0, reinterpret_cast<void*>(&Hook52ED60)));
++#else
+         AscRuntime::ReplaceFunction(0x52ED60, reinterpret_cast<void*>(&Hook52ED60));
++#endif
+         g_5DEA60 = reinterpret_cast<Arg_t>(AscRuntime::Detour(0x5DEA60, 10, reinterpret_cast<void*>(&Hook5DEA60)));
+         g_6DAC10 = reinterpret_cast<This_t>(AscRuntime::Detour(0x6DAC10, 6, reinterpret_cast<void*>(&Hook6DAC10)));
+         AscRuntime::ReplaceFunction(0x726160, reinterpret_cast<void*>(&Replace726160));
+diff --git a/src/Ascension/AscCVarHooks.cpp b/src/Ascension/AscCVarHooks.cpp
+index 9c4db03..901df9f 100644
+--- a/src/Ascension/AscCVarHooks.cpp
++++ b/src/Ascension/AscCVarHooks.cpp
+@@ -55,7 +55,9 @@ namespace
+         }
+     }
+ #else
+-    int Original4E4610() { AscX64::Unported("Original4E4610"); return {}; }
++    // x64: trampolim do MinHook. void CCharacterSelection::UpdateCharacterList()
++    void (*g_4E4610)() = nullptr;
++    int Original4E4610() { g_4E4610(); return 0; }
+ #endif
+     int __cdecl ConfigCache4E4610()   // FUN_10113040
+     {
+@@ -173,7 +175,11 @@ namespace
+     void Init()   // FUN_101141e0 (its CVar queue and Lua registration live elsewhere)
+     {
+         g_766640 = reinterpret_cast<Write_t>(AscRuntime::Detour(0x766640, 9, reinterpret_cast<void*>(&Hook766640)));
++#if ASC_X64
++        g_4E4610 = reinterpret_cast<void (*)()>(AscRuntime::Detour(0x4E4610, 0, reinterpret_cast<void*>(&Hook4E4610)));
++#else
+         AscRuntime::ReplaceFunction(0x4E4610, reinterpret_cast<void*>(&Hook4E4610));
++#endif
+         g_512890 = reinterpret_cast<Save_t>(AscRuntime::Detour(0x512890, 7, reinterpret_cast<void*>(&Hook512890)));
+         g_76A220 = reinterpret_cast<Fn4_t>(AscRuntime::Detour(0x76A220, 9, reinterpret_cast<void*>(&Hook76A220)));
+     }
+diff --git a/src/Ascension/AscGlobalsJ.cpp b/src/Ascension/AscGlobalsJ.cpp
+index c0fb8ab..a7de7e7 100644
+--- a/src/Ascension/AscGlobalsJ.cpp
++++ b/src/Ascension/AscGlobalsJ.cpp
+@@ -24,6 +24,9 @@
+ #include <Ascension/AscClientDbc.hpp>
+ #include <Ascension/AscBindings.hpp>
+ #include <Ascension/AscX64.hpp>
++#if ASC_X64
++#include <intrin.h>   // _ReturnAddress nos detours 0x7385C0 / 0x4F5F40
++#endif
+ #include <Ascension/AscAddons.hpp>
+ #include <Ascension/AscCAMgr.hpp>
+ #include <Ascension/AscBridgeStore.hpp>
+@@ -136,7 +139,12 @@ namespace
+         }
+     }
+ #else
+-    void Detour74F910() { AscX64::Unported("Detour74F910"); }
++    // x64: void SendCombatLogEvents() sem argumentos.
++    void Detour74F910()
++    {
++        if (CombatLogAllowed())
++            reinterpret_cast<void (*)()>(g_74F910Trampoline)();
++    }
+ #endif
+ 
+     // ---- script error handler ------------------------------------------------------------------------
+@@ -647,7 +655,15 @@ namespace
+         }
+     }
+ #else
+-    void Detour7385C0() { AscX64::Unported("Detour7385C0"); }
++    // x64: void CGUnit_C::PlayBaseAnimation(unsigned anim, int b) (__thiscall). O retorno 0x75520B (call em
++    // CGUnit_C::PlayAttackerRound) vem do extra-addr (@0x2DBA6B).
++    void Detour7385C0(void* unit, uint32_t anim, int b)
++    {
++        if (g_attackAnimation && unit == AscX64::Fn<void* (*)()>(0x4038F0)() &&
++            _ReturnAddress() == AscX64::Ptr(0x75520B))
++            anim = static_cast<uint32_t>(g_attackAnimation);
++        reinterpret_cast<void (*)(void*, uint32_t, int)>(g_7385C0Trampoline)(unit, anim, b);
++    }
+ #endif
+ 
+     int SetAttackAnimation(lua_State* L)
+@@ -680,7 +696,15 @@ namespace
+         }
+     }
+ #else
+-    void Detour4F5F40() { AscX64::Unported("Detour4F5F40"); }
++    // x64: float CGUnit::GetMeleeRange(const CGUnit*) (__thiscall). O retorno 0x4F7FB6 (call em
++    // CGWorldFrame::CursorTrackUnit) vem do extra-addr (@0x3F04E4). Como no x86, so 0.0 exato cai no original
++    // (NaN tambem devolve g_attackDistance).
++    float Detour4F5F40(void* self, const void* other)
++    {
++        if (_ReturnAddress() == AscX64::Ptr(0x4F7FB6) && !(g_attackDistance == kZero))
++            return g_attackDistance;
++        return reinterpret_cast<float (*)(void*, const void*)>(g_4F5F40Trampoline)(self, other);
++    }
+ #endif
+ 
+     int SetAttackDistance(lua_State* L)
+diff --git a/src/Ascension/AscLoadingScreen.cpp b/src/Ascension/AscLoadingScreen.cpp
+index 8bf44b7..23afe8a 100644
+--- a/src/Ascension/AscLoadingScreen.cpp
++++ b/src/Ascension/AscLoadingScreen.cpp
+@@ -59,7 +59,12 @@ namespace
+         }
+     }
+ #else
+-    void Hook409ED0() { AscX64::Unported("Hook409ED0"); }
++    // x64: bool LoadSimpleBackgroundTexture() sem argumentos -- nao ha registrador de entrada a preservar.
++    bool Hook409ED0()
++    {
++        ApplyVariation();
++        return reinterpret_cast<bool (*)()>(g_409ED0)();
++    }
+ #endif
+ 
+     typedef int(__cdecl* Fn0_t)();
+diff --git a/src/Ascension/AscMain.cpp b/src/Ascension/AscMain.cpp
+index c469ba0..2c1e2b0 100644
+--- a/src/Ascension/AscMain.cpp
++++ b/src/Ascension/AscMain.cpp
+@@ -99,11 +99,24 @@ static void __declspec(naked) CipherInitDetour()
+     }
+ }
+ #else
+-static void CipherInitDetour() { AscX64::Unported("CipherInitDetour"); }
++// x64: void WowConnection::SetEncryptionKey(const uchar*, uchar, uchar, const uchar*, uchar) (__thiscall); no x64
++// nao ha limpeza de pilha pelo callee, basta retornar.
++static void CipherInitDetour(void*, const unsigned char*, unsigned char, unsigned char, const unsigned char*,
++                             unsigned char)
++{
++    ++g_cipherInitSkips;
++    AscLog::Printf("plaintext-headers: cipher init skipped (#%u)", g_cipherInitSkips);
++}
+ #endif
+ 
+ static void ApplyPlaintextWorldHeaders()
+ {
++#if ASC_X64
++    // MinHook confere/realoca o prologo sozinho (o expect 55 8B EC 81 EC e do x86).
++    if (AscX64::Replace(0x466BF0, reinterpret_cast<void*>(&CipherInitDetour), "CipherInitDetour"))
++        AscLog::Printf("plaintext-headers: cipher init 0x466BF0 substituido por %p", reinterpret_cast<void*>(&CipherInitDetour));
++    return;
++#else
+     static const uint8_t expect[5] = { 0x55, 0x8B, 0xEC, 0x81, 0xEC };   // push ebp; mov ebp,esp; sub esp,...
+ 
+     uint8_t* site = reinterpret_cast<uint8_t*>(ASC_PTR(0x466BF0));
+@@ -119,6 +132,7 @@ static void ApplyPlaintextWorldHeaders()
+     Util::OverwriteUInt32AtAddress(0x466BF1, rel);
+     AscLog::Printf("plaintext-headers: cipher init 0x466BF0 detoured to %p "
+                    "(requires server AscensionCompat.PlaintextWorldHeaders = 1)", (void*)&CipherInitDetour);
++#endif
+ }
+ 
+ // FUN_10a3d070, the original's SIGABRT handler: abort() becomes a STATUS_INVALID_CRUNTIME_PARAMETER exception
+diff --git a/src/Ascension/AscMovementForce.cpp b/src/Ascension/AscMovementForce.cpp
+index 6ab1972..81d6719 100644
+--- a/src/Ascension/AscMovementForce.cpp
++++ b/src/Ascension/AscMovementForce.cpp
+@@ -591,10 +591,26 @@ namespace
+         }
+     }
+ #else
+-    int Original6F1490() { AscX64::Unported("Original6F1490"); return {}; }
++    // x64: trampolim do MinHook. int MovementIdleMoveUnits(const void*, void*) -- handler de evento: no x86 o
++    // hook nao toca na pilha e os 2 args seguem intactos; no x64 vao em rcx/rdx e precisam ser repassados.
++    int (*g_6F1490)(const void*, void*) = nullptr;
++    const void* g_6F1490Data = nullptr;
++    void* g_6F1490Param = nullptr;
++    int Original6F1490() { return g_6F1490(g_6F1490Data, g_6F1490Param); }
+ #endif
+ 
++#if ASC_X64
++    int Hook6F1490Body();
++    int Hook6F1490(const void* data, void* param)
++    {
++        g_6F1490Data = data;
++        g_6F1490Param = param;
++        return Hook6F1490Body();
++    }
++    int Hook6F1490Body()
++#else
+     int __cdecl Hook6F1490()   // FUN_102b9c00
++#endif
+     {
+         const int r = Original6F1490();
+         const int32_t now = Now();
+@@ -706,7 +722,11 @@ namespace
+         g_updateOriginal = reinterpret_cast<Update_t>(AscRuntime::Detour(0x6EB730, 5, reinterpret_cast<void*>(&Hook6EB730)));
+         g_762E00 = reinterpret_cast<Fn5_t>(AscRuntime::Detour(0x762E00, 6, reinterpret_cast<void*>(&Hook762E00)));
+         g_403B70 = reinterpret_cast<Fn403B70_t>(AscRuntime::Detour(0x403B70, 6, reinterpret_cast<void*>(&Hook403B70)));
++#if ASC_X64
++        g_6F1490 = reinterpret_cast<int (*)(const void*, void*)>(AscRuntime::Detour(0x6F1490, 0, reinterpret_cast<void*>(&Hook6F1490)));
++#else
+         AscRuntime::ReplaceFunction(0x6F1490, reinterpret_cast<void*>(&Hook6F1490));
++#endif
+     }
+ 
+     AscBindings::Module s_module(nullptr, 0, &Init);
+diff --git a/src/Ascension/AscSmallHooks.cpp b/src/Ascension/AscSmallHooks.cpp
+index 2b710f1..e879563 100644
+--- a/src/Ascension/AscSmallHooks.cpp
++++ b/src/Ascension/AscSmallHooks.cpp
+@@ -55,7 +55,9 @@ namespace
+         }
+     }
+ #else
+-    int Original6E09E0(uint8_t*) { AscX64::Unported("Original6E09E0"); return {}; }
++    // x64: trampolim do MinHook. int CGPlayer_C::RefreshVisibleItems() (__thiscall)
++    int (*g_6E09E0)(uint8_t*) = nullptr;
++    int Original6E09E0(uint8_t* unit) { return g_6E09E0(unit); }
+ #endif
+     int __fastcall Hook6E09E0(uint8_t* unit ASC_EDX_P(void* edx))   // FUN_102cac10
+     {
+@@ -208,7 +210,11 @@ namespace
+     {
+         g_454070 = reinterpret_cast<Fn454070_t>(AscRuntime::Detour(0x454070, 5, reinterpret_cast<void*>(&Hook454070)));
+         g_5C2030 = reinterpret_cast<Fn2_t>(AscRuntime::Detour(0x5C2030, 9, reinterpret_cast<void*>(&Hook5C2030)));
++#if ASC_X64
++        g_6E09E0 = reinterpret_cast<int (*)(uint8_t*)>(AscRuntime::Detour(0x6E09E0, 0, reinterpret_cast<void*>(&Hook6E09E0)));
++#else
+         AscRuntime::ReplaceFunction(0x6E09E0, reinterpret_cast<void*>(&Hook6E09E0));
++#endif
+         AscClientOptions::CVarSpec queue{"SpellQueueWindow", "400", 1, 3, nullptr};
+         queue.out = &g_spellQueueWindow;
+         queue.help = "Sets how early you can pre-activate/queue a spell/ability. (In Milliseconds)";
+diff --git a/src/Ascension/AscSpellTokens.cpp b/src/Ascension/AscSpellTokens.cpp
+index d560f12..ccd6d47 100644
+--- a/src/Ascension/AscSpellTokens.cpp
++++ b/src/Ascension/AscSpellTokens.cpp
+@@ -337,7 +337,12 @@ namespace
+         }
+     }
+ #else
+-    int Original6238A0() { AscX64::Unported("Original6238A0"); return {}; }
++    // x64: o trampolim do MinHook substitui o prologo refeito (o x64 nao tem o probe 0x40BB50 no mesmo lugar).
++    // int CGTooltip::SetSpell(int spell, int, unsigned, int, int, int, int, const TalentRec*, CGTalentGroup_C*,
++    // int x6) (__thiscall), assinatura do protos.json.
++    typedef int (*SetSpell_t)(void*, int, int, uint32_t, int, int, int, int, const void*, void*, int, int, int, int,
++                              int, int);
++    SetSpell_t g_6238A0 = nullptr;
+ #endif
+ 
+     // FUN_10a11130: __fastcall with fifteen stack arguments (ret 0x3C); the first is the spell.
+@@ -384,7 +389,18 @@ namespace
+         }
+     }
+ #else
+-    int Hook6238A0() { AscX64::Unported("Hook6238A0"); return {}; }
++    // x64: mesma logica do naked: g_formatSpell e o salto 0x62442C valem so durante o original.
++    int Hook6238A0(void* self, int spell, int a2, uint32_t a3, int a4, int a5, int a6, int a7, const void* talent,
++                   void* group, int a10, int a11, int a12, int a13, int a14, int a15)
++    {
++        g_formatSpell = static_cast<uint32_t>(spell);
++        if (CustomAttr40(static_cast<uint32_t>(spell), 0x40))
++            Patch62442C(true);
++        const int r = g_6238A0(self, spell, a2, a3, a4, a5, a6, a7, talent, group, a10, a11, a12, a13, a14, a15);
++        Patch62442C(false);
++        g_formatSpell = 0;
++        return r;
++    }
+ #endif
+ 
+     template <class T> T Hook(uint32_t target, uint32_t prologue, void* fn)
+@@ -428,7 +444,11 @@ namespace
+         g_5797F0 = Hook<Name_t>(0x5797F0, 5, reinterpret_cast<void*>(&Hook5797F0));    // hooked 0x5797F0
+         g_57AAF0 = Hook<Format_t>(0x57AAF0, 6, reinterpret_cast<void*>(&Hook57AAF0));  // hooked 0x57AAF0
+         g_608390 = Hook<Fn3_t>(0x608390, 6, reinterpret_cast<void*>(&Hook608390));     // hooked 0x608390
++#if ASC_X64
++        g_6238A0 = Hook<SetSpell_t>(0x6238A0, 0, reinterpret_cast<void*>(&Hook6238A0));
++#else
+         AscRuntime::ReplaceFunction(0x6238A0, reinterpret_cast<void*>(&Hook6238A0));
++#endif
+     }
+ 
+     AscBindings::Module s_module(nullptr, 0, &Init);

@@ -1,0 +1,331 @@
+diff --git a/src/Ascension/AscGlobalsB.cpp b/src/Ascension/AscGlobalsB.cpp
+index 5fd5e92..9263730 100644
+--- a/src/Ascension/AscGlobalsB.cpp
++++ b/src/Ascension/AscGlobalsB.cpp
+@@ -67,7 +67,7 @@ namespace
+     int GetItemSetID(lua_State* L)
+     {
+         const uint8_t* rec = ItemRecord(static_cast<uint32_t>(ArgInt(L, 1)));
+-        AscLua::lua_pushinteger(L, rec ? *reinterpret_cast<const int32_t*>(rec + 0x1A8) : 0);
++        AscLua::lua_pushinteger(L, rec ? *reinterpret_cast<const int32_t*>(rec + ASC_OFF(0x1A8, 0x1B0)) : 0);
+         return 1;
+     }
+ 
+@@ -76,7 +76,7 @@ namespace
+         const uint8_t* rec = ItemRecord(static_cast<uint32_t>(ArgInt(L, 1)));
+         if (!rec)
+             return 0;
+-        AscLua::lua_pushinteger(L, *reinterpret_cast<const int32_t*>(rec + 0x178));
++        AscLua::lua_pushinteger(L, *reinterpret_cast<const int32_t*>(rec + ASC_OFF(0x178, 0x17C)));
+         return 1;
+     }
+ 
+@@ -85,7 +85,7 @@ namespace
+         double v = 0.0;
+         if (AscLua::lua_gettop(L) == 1 && AscLua::lua_isnumber(L, 1))
+             if (const uint8_t* rec = ItemRecord(static_cast<uint32_t>(ArgInt(L, 1))))
+-                v = static_cast<double>(*reinterpret_cast<const int32_t*>(rec + 0xF4));
++                v = static_cast<double>(*reinterpret_cast<const int32_t*>(rec + ASC_OFF(0xF4, 0xF8)));
+         AscLua::lua_pushnumber(L, v);
+         return 1;
+     }
+diff --git a/src/Ascension/AscGlobalsC.cpp b/src/Ascension/AscGlobalsC.cpp
+index 431f868..b86cbd5 100644
+--- a/src/Ascension/AscGlobalsC.cpp
++++ b/src/Ascension/AscGlobalsC.cpp
+@@ -156,7 +156,7 @@ namespace
+                 reinterpret_cast<void*(__thiscall*)(void*, uint32_t, void*, void*, void*, int)>(ASC_PTR(0x67CA30))(
+                     reinterpret_cast<void*>(ASC_PTR(0xC5D828)), entry, nullptr, nullptr, nullptr, 0));
+             if (rec)
+-                delay = *reinterpret_cast<const int32_t*>(rec + 0xF4);
++                delay = *reinterpret_cast<const int32_t*>(rec + ASC_OFF(0xF4, 0xF8));
+         }
+         AscLua::lua_pushnumber(L, static_cast<double>(static_cast<float>(delay) / static_cast<float>(attackTime)));
+         return 1;
+diff --git a/src/Ascension/AscItemCollections.cpp b/src/Ascension/AscItemCollections.cpp
+index 25d2213..cd5c245 100644
+--- a/src/Ascension/AscItemCollections.cpp
++++ b/src/Ascension/AscItemCollections.cpp
+@@ -173,9 +173,9 @@ namespace
+     // are released through 0x8274F0.
+     void RemoveAttached(uint8_t* component, uint32_t index)
+     {
+-        uint8_t* scene = *reinterpret_cast<uint8_t* const*>(component + 0x38);
++        uint8_t* scene = *reinterpret_cast<uint8_t* const*>(component + ASC_OFF(0x38, 0x40));
+         std::vector<uint8_t*> matched;
+-        for (uint8_t* m = *reinterpret_cast<uint8_t* const*>(scene + 0x58); m; m = *reinterpret_cast<uint8_t* const*>(m + 0x60))
++        for (uint8_t* m = *reinterpret_cast<uint8_t* const*>(scene + ASC_OFF(0x58, 0x98)); m; m = *reinterpret_cast<uint8_t* const*>(m + ASC_OFF(0x60, 0xA8)))
+             if (TakeAttached(component, index, m))
+                 matched.push_back(m);
+         for (uint8_t* m : matched)
+@@ -189,8 +189,8 @@ namespace
+     void Attach(uint8_t* component, uint32_t index, const uint8_t* display)
+     {
+         RemoveAttached(component, index);
+-        if (!display || *reinterpret_cast<const uint32_t*>(component + 0x18) == 0 ||
+-            *reinterpret_cast<const uint32_t*>(component + 0x1C) == 2 || (g_inCall5989E0 && g_inCall597FC0) || !g_applyComponents)
++        if (!display || *reinterpret_cast<const uint32_t*>(component + ASC_OFF(0x18, 0x20)) == 0 ||
++            *reinterpret_cast<const uint32_t*>(component + ASC_OFF(0x1C, 0x24)) == 2 || (g_inCall5989E0 && g_inCall597FC0) || !g_applyComponents)
+             return;
+         if (!g_collectionsBuilt)
+             BuildCollections();
+@@ -198,8 +198,8 @@ namespace
+         if (it == g_collections.end())
+             return;
+         AscDbc::Table& t = Collections();
+-        const uint32_t race = *reinterpret_cast<const uint32_t*>(component + 0x18);
+-        const uint32_t gender = *reinterpret_cast<const uint32_t*>(component + 0x1C);
++        const uint32_t race = *reinterpret_cast<const uint32_t*>(component + ASC_OFF(0x18, 0x20));
++        const uint32_t gender = *reinterpret_cast<const uint32_t*>(component + ASC_OFF(0x1C, 0x24));
+         for (const uint8_t* row : it->second)
+         {
+             const std::string model = ModelPath(index, t.Str(row, 0x10), race, gender);
+@@ -212,7 +212,7 @@ namespace
+             g_pendingScale = AscDbc::Table::F32(row, hd ? 0x1C : 0x18);
+             g_capture = true;
+             reinterpret_cast<void(__cdecl*)(uintptr_t, uint32_t, char*, char*, int, const uint8_t*)>(ASC_PTR(0x4EAA70))(
+-                *reinterpret_cast<const uint32_t*>(component + 0x38), AscDbc::Table::U32(row, hd ? 0xC : 8),
++                *reinterpret_cast<const uintptr_t*>(component + ASC_OFF(0x38, 0x40)), AscDbc::Table::U32(row, hd ? 0xC : 8),
+                 reinterpret_cast<char*>(ASC_PTR(0xB6B600)), reinterpret_cast<char*>(ASC_PTR(0xB6B4F8)), 0, display);
+             if (void* m = g_captured)
+             {
+@@ -409,7 +409,7 @@ namespace
+                 if (index != -1)
+                 {
+                     uint8_t display[0x64];
+-                    const bool found = AscClientDbc::Copy(0x4CFD90, 0xAD3DDC, *reinterpret_cast<const uint32_t*>(component + 0x428 + index * 4), display) != 0;
++                    const bool found = AscClientDbc::Copy(0x4CFD90, 0xAD3DDC, *reinterpret_cast<const uint32_t*>(component + ASC_OFF(0x428, 0x590) + index * 4), display) != 0;
+                     Attach(component, static_cast<uint32_t>(index), found ? display : nullptr);
+                 }
+             }
+diff --git a/src/Ascension/AscRuntime.cpp b/src/Ascension/AscRuntime.cpp
+index 94f81aa..31650a1 100644
+--- a/src/Ascension/AscRuntime.cpp
++++ b/src/Ascension/AscRuntime.cpp
+@@ -253,6 +253,17 @@ namespace
+     // 0x6ECF80 (__thiscall, 7 stack arguments, ret 0x1C; 6 bytes). The original's detour 0x102762B0 (hook
+     // object 0x10BCB650) runs list 0x10BE2BAC (FUN_10278660) with the object's +0x144, then the original.
+     std::vector<void (*)(uintptr_t)>& Before6ECF80List() { static std::vector<void (*)(uintptr_t)> v; return v; }
++#if ASC_X64
++    // x64: CMovement_C::Teleport(WOWGUID, const C3Vector&, float, int, int, unsigned char) -- void, sem retorno
++    typedef void(__fastcall* Fn6ECF80_t)(void*, uint64_t, const void*, float, int32_t, int32_t, uint8_t);
++    Fn6ECF80_t g_6ECF80Trampoline = nullptr;
++    void __fastcall Detour6ECF80(void* self, uint64_t guid, const void* pos, float facing, int32_t d, int32_t e, uint8_t f)
++    {
++        for (auto cb : Before6ECF80List())
++            cb(*reinterpret_cast<const uintptr_t*>(static_cast<uint8_t*>(self) + ASC_OFF(0x144, 0x178)));
++        g_6ECF80Trampoline(self, guid, pos, facing, d, e, f);
++    }
++#else
+     typedef int(__fastcall* Fn6ECF80_t)(void* ASC_EDX_P(void*), uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+     Fn6ECF80_t g_6ECF80Trampoline = nullptr;
+     int __fastcall Detour6ECF80(void* self ASC_EDX_P(void* edx), uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t g)
+@@ -261,6 +272,7 @@ namespace
+             cb(*reinterpret_cast<const uintptr_t*>(static_cast<uint8_t*>(self) + ASC_OFF(0x144, 0x178)));
+         return g_6ECF80Trampoline(self ASC_EDX_A(edx), a, b, c, d, e, f, g);
+     }
++#endif
+ 
+     // 0x724820 (9 bytes) / 0x71E930 (6 bytes): __thiscall(unit, a, b), ret 8, edx passed through. The
+     // original's detours 0x10275F60 / 0x10276090 (hook objects 0x10BCB62C / 0x10BCB644) run their list with
+diff --git a/src/Ascension/AscSmallApis.cpp b/src/Ascension/AscSmallApis.cpp
+index bd549ec..2807cd8 100644
+--- a/src/Ascension/AscSmallApis.cpp
++++ b/src/Ascension/AscSmallApis.cpp
+@@ -95,7 +95,7 @@ namespace
+         const bool save = AscLua::lua_toboolean(L, 2) != 0;
+         if (uint8_t* cvar = static_cast<uint8_t*>(FindCVar(name.c_str())))
+         {
+-            uint32_t& flags = *reinterpret_cast<uint32_t*>(cvar + 0x1C);
++            uint32_t& flags = *reinterpret_cast<uint32_t*>(cvar + ASC_OFF(0x1C, 0x34));
+             flags = save ? (flags & ~0x80u) : (flags | 0x80u);
+         }
+         return 0;
+@@ -220,7 +220,7 @@ namespace
+         const uint8_t* rec = nullptr;
+         if (item)
+         {
+-            const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(item + 8) + 0xC);
++            const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(item + ASC_OFF(8, 0x10)) + 0xC);
+             rec = static_cast<const uint8_t*>(reinterpret_cast<void*(__thiscall*)(void*, uint32_t, void*, void*, void*, int)>(ASC_PTR(0x67CA30))(
+                 reinterpret_cast<void*>(ASC_PTR(0xC5D828)), entry, nullptr, nullptr, nullptr, 0));
+         }
+@@ -256,7 +256,7 @@ namespace
+             AscLua::lua_pushnil(L);
+             return 1;
+         }
+-        const uint64_t guid = **reinterpret_cast<const uint64_t* const*>(item + 8);
++        const uint64_t guid = **reinterpret_cast<const uint64_t* const*>(item + ASC_OFF(8, 0x10));
+         PushInt(L, static_cast<int32_t>(AscObjectAddon::Item(guid)[0].value));
+         return 1;
+     }
+@@ -294,7 +294,7 @@ namespace
+     template <class F> bool ForOpenLoggedQuest(uint8_t* player, F fn)
+     {
+         const uint32_t count = *reinterpret_cast<const uint32_t*>(ASC_PTR(0xC23AD0));
+-        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + ASC_OFF(8, 0x10));
+         for (uint32_t i = 0; i < count; ++i)
+         {
+             const uint32_t* e = reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(ASC_PTR(0xC237B0)) + i * 0x10);   // CGQuestLog::m_quests (QuestLogEntry 16 bytes nos dois)
+@@ -321,12 +321,12 @@ namespace
+     // bags (0xC23540).
+     uint32_t CountInBags(uint8_t* player, uint32_t item)
+     {
+-        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + ASC_OFF(8, 0x10));
+         uint32_t n = 0;
+         for (uint32_t slot = 0x17; slot < 0x27; ++slot)
+             if (const uint8_t* it = static_cast<const uint8_t*>(ObjectPtr(*reinterpret_cast<const uint64_t*>(desc + 0x510 + slot * 8), 2)))
+-                if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + 8) + 0xC) == item)
+-                    n += *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + 8) + 0x38);
++                if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0xC) == item)
++                    n += *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0x38);
+         const uint64_t* bags = reinterpret_cast<const uint64_t*>(ASC_PTR(0xC23540));
+         for (int b = 0; b < 4; ++b)
+         {
+@@ -336,11 +336,11 @@ namespace
+             void* inv = (*reinterpret_cast<void*(__thiscall***)(void*)>(bag))[0x24 / 4](bag);
+             if (!inv)
+                 continue;
+-            const uint32_t slots = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(bag + 8) + 0x100);
++            const uint32_t slots = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(bag + ASC_OFF(8, 0x10)) + 0x100);
+             for (uint32_t i = 0; i < slots; ++i)
+                 if (const uint8_t* it = reinterpret_cast<uint8_t*(__thiscall*)(void*, uint32_t)>(ASC_PTR(0x754390))(inv, i))
+-                    if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + 8) + 0xC) == item)
+-                        n += *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + 8) + 0x38);
++                    if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0xC) == item)
++                        n += *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0x38);
+         }
+         return n;
+     }
+@@ -384,7 +384,7 @@ namespace
+             for (uint32_t j = 0; j < 6; ++j)
+                 for (uint32_t u = 0; u < 6; ++u)
+                 {
+-                    const int32_t item = *reinterpret_cast<const int32_t*>(c + 0x40 + j * 4);
++                    const int32_t item = *reinterpret_cast<const int32_t*>(c + ASC_OFF(0x40, 0x4C) + j * 4);
+                     if (item != 0 && item == *reinterpret_cast<const int32_t*>(q + 0x1C44 + u * 4))
+                     {
+                         if (quest)
+@@ -412,7 +412,7 @@ namespace
+             const uint8_t* unit = guid ? static_cast<const uint8_t*>(ObjectPtr(guid, 8)) : nullptr;
+             if (unit)
+             {
+-                const uint32_t state = *reinterpret_cast<const uint32_t*>(unit + 0x90);
++                const uint32_t state = *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x90, 0x108));
+                 if (state != 0)
+                 {
+                     const char* name;
+@@ -427,13 +427,13 @@ namespace
+                     }
+                     PushStr(L, name);
+                     AscLua::lua_pushinteger(L, -1);
+-                    const uint8_t* info = *reinterpret_cast<uint8_t* const*>(unit + 0x8C);
+-                    const uint8_t* block = info ? *reinterpret_cast<uint8_t* const*>(info + 0x2C) : nullptr;
+-                    const char* text = block ? reinterpret_cast<const char*>(block + 0x3C) : nullptr;
++                    const uint8_t* info = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(0x8C, 0x100));
++                    const uint8_t* block = info ? *reinterpret_cast<uint8_t* const*>(info + ASC_OFF(0x2C, 0x48)) : nullptr;
++                    const char* text = block ? reinterpret_cast<const char*>(block + ASC_OFF(0x3C, 0x74)) : nullptr;
+                     PushStr(L, text);
+                     return 3;
+                 }
+-                const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0xC);
++                const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0xC);
+                 if (const uint8_t* rec = CreatureRec(entry))
+                 {
+                     const uint32_t credit = *reinterpret_cast<const uint32_t*>(rec + 0x6C);
+@@ -464,8 +464,8 @@ namespace
+         if (uint8_t* player = ActivePlayer())
+         {
+             const int32_t zone = ToInt(CheckNumber(L, 1));
+-            const uint32_t type = *reinterpret_cast<const uint32_t*>(player + 0x14);
+-            const uint8_t race = (type == 3 || type == 4) ? *(*reinterpret_cast<uint8_t* const*>(player + 8) + 0x5C) : 0;
++            const uint32_t type = *reinterpret_cast<const uint32_t*>(player + ASC_OFF(0x14, 0x24));
++            const uint8_t race = (type == 3 || type == 4) ? *(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0x5C) : 0;
+             int32_t side = 0;
+             if (const uint8_t* chrRace = ClientDbcRow(0xAD3428, race))
+             {
+diff --git a/src/Ascension/AscTooltipScaling.cpp b/src/Ascension/AscTooltipScaling.cpp
+index bf354f3..a0aee24 100644
+--- a/src/Ascension/AscTooltipScaling.cpp
++++ b/src/Ascension/AscTooltipScaling.cpp
+@@ -289,14 +289,14 @@ namespace
+         }
+         g_itemCache = ItemCache(item);
+         const uint8_t* scaled = ScaledRecord();
+-        if (scaled && g_itemCache && *reinterpret_cast<const int32_t*>(scaled + 0xC) < *reinterpret_cast<const int32_t*>(g_itemCache + 0x34))
++        if (scaled && g_itemCache && *reinterpret_cast<const int32_t*>(scaled + 0xC) < *reinterpret_cast<const int32_t*>(g_itemCache + ASC_OFF(0x34, 0x38)))
+             Patch62B98F(false);
+         if (g_compare)
+             Patch631760(false);
+         if (!RealmInfoSvc::Get().Dev() && g_itemCache && *reinterpret_cast<const uint32_t*>(g_itemCache + ASC_OFF(0x14, 0x18)) == 4)
+         {
+             const uint32_t cap = AscGameEvents::ServerMaxLevel();
+-            const uint32_t required = *reinterpret_cast<const uint32_t*>(g_itemCache + 0x38);
++            const uint32_t required = *reinterpret_cast<const uint32_t*>(g_itemCache + ASC_OFF(0x38, 0x3C));
+             if ((cap == 0x50 && required == 0x46) || (cap == 0x46 && required == 0x3C))
+                 Patch62B98F(false);
+         }
+@@ -379,7 +379,7 @@ namespace
+     float Delay(const uint32_t rec[0x2A])
+     {
+         const uint8_t* c = ItemCache(rec[2]);
+-        return c ? static_cast<float>(UintToDouble(*reinterpret_cast<const uint32_t*>(c + 0xF4))) : 2.0f;
++        return c ? static_cast<float>(UintToDouble(*reinterpret_cast<const uint32_t*>(c + ASC_OFF(0xF4, 0xF8)))) : 2.0f;
+     }
+ 
+     // FUN_10210780: stat `type` in a minus its value in b (0 where absent).
+@@ -505,17 +505,17 @@ namespace
+         const uint32_t lost = max - cur;
+         uint32_t level = ItemLevelOf(Guid(desc));
+         if (!level)
+-            level = *reinterpret_cast<const uint32_t*>(c + 0x34);
++            level = *reinterpret_cast<const uint32_t*>(c + ASC_OFF(0x34, 0x38));
+         // DurabilityCosts (FUN_100b2c50): o original indexa m_records pela posicao (level-1); ids comecam em 1
+         const uint8_t* costs = AscClientDbc::Row(0xAD371C, level);
+         if (!costs)
+             return 0;
+         // DurabilityQuality (FUN_100b2c70): posicao quality*2+1 -> id quality*2+2
+-        const uint8_t* quality = AscClientDbc::Row(0xAD3740, *reinterpret_cast<const uint32_t*>(c + 0x14) * 2 + 2);
++        const uint8_t* quality = AscClientDbc::Row(0xAD3740, *reinterpret_cast<const uint32_t*>(c + ASC_OFF(0x14, 0x18)) * 2 + 2);
+         if (!quality)
+             return 0;
+-        const uint32_t cls = *reinterpret_cast<const uint32_t*>(c + 4);
+-        uint32_t column = *reinterpret_cast<const uint32_t*>(c + 8);
++        const uint32_t cls = *reinterpret_cast<const uint32_t*>(c + ASC_OFF(4, 8));
++        uint32_t column = *reinterpret_cast<const uint32_t*>(c + ASC_OFF(8, 0xC));
+         if (cls == 2)
+             ;
+         else if (cls == 4)
+@@ -578,10 +578,10 @@ namespace
+         if (line > 0)
+         {
+             typedef void(__thiscall* SetTextFn)(void*, const char*, int);
+-            void* left = *reinterpret_cast<void**>(*reinterpret_cast<uint8_t**>(tip + 0x2B4) - 4 + line * 4);
++            void* left = *reinterpret_cast<void**>(*reinterpret_cast<uint8_t**>(tip + ASC_OFF(0x2B4, 0x478)) - ASC_OFF(4, 8) + line * ASC_OFF(4, 8));
+             if (left)
+                 reinterpret_cast<SetTextFn>(ASC_PTR(0x483910))(left, "", 1);
+-            void* right = *reinterpret_cast<void**>(*reinterpret_cast<uint8_t**>(tip + 0x2C0) - 4 + line * 4);
++            void* right = *reinterpret_cast<void**>(*reinterpret_cast<uint8_t**>(tip + ASC_OFF(0x2C0, 0x488)) - ASC_OFF(4, 8) + line * ASC_OFF(4, 8));
+             if (right)
+                 reinterpret_cast<SetTextFn>(ASC_PTR(0x483910))(right, "", 1);
+         }
+@@ -1143,7 +1143,7 @@ namespace
+                 if ((g_itemCache && min1 != 0 && max1 != 0) || (min2 != 0 && max2 != 0))
+                 {
+                     const float average = static_cast<float>(UintToDouble(static_cast<uint32_t>(max1 + min1 + max2 + min2))) * 0.5f;
+-                    const float delay = static_cast<float>(UintToDouble(*reinterpret_cast<const uint32_t*>(g_itemCache + 0xF4))) / 1000.0f;
++                    const float delay = static_cast<float>(UintToDouble(*reinterpret_cast<const uint32_t*>(g_itemCache + ASC_OFF(0xF4, 0xF8)))) / 1000.0f;
+                     Format(out, sizeof(out), "(%.1f damage per second)", static_cast<double>(average / delay));
+                     Original(out, right, color, a4);
+                     return;
+@@ -1207,7 +1207,7 @@ namespace
+         if (it != g_onTextChanged.end())
+         {
+             lua_rawgeti(L, LUA_REGISTRYINDEX, it->second);
+-            lua_rawgeti(L, LUA_REGISTRYINDEX, *reinterpret_cast<const int*>(static_cast<uint8_t*>(tip) + 8));
++            lua_rawgeti(L, LUA_REGISTRYINDEX, *reinterpret_cast<const int*>(static_cast<uint8_t*>(tip) + ASC_OFF(8, 0xC)));
+             AscLua::lua_pushstring(L, left ? left : "");
+             AscLua::lua_pushstring(L, right ? right : "");
+             if (lua_pcall(L, 3, 2, 0) == 0)

@@ -1,0 +1,140 @@
+#include <Client/CVar.hpp>
+#include <Ascension/AscX64.hpp>
+#include <Ascension/AscLog.hpp>
+#include <Ascension/AscRuntime.hpp>
+#include <Ascension/AscGraphics.hpp>
+#include <Ascension/AscClientOptions.hpp>
+#include <Data/Enums.hpp>
+#include <Misc/DataContainer.hpp>
+#include <Misc/Util.hpp>
+
+#include <PatchConfig.hpp>
+
+// The original's detour on the client's glue CVar registration 0x401B60 (FUN_10114180, installer
+// FUN_101141e0; 6 bytes: push ebp / mov ebp,esp / sub esp,0x20). Until 2026-09-27 the scaffold rewrote the
+// call at 0x404147 instead.
+static int32_t (__cdecl* g_401B60)() = nullptr;
+
+void CVar::ApplyPatches()
+{
+#if GLUEMGREXTENSION
+    g_401B60 = reinterpret_cast<int32_t (__cdecl*)()>(AscRuntime::Detour(0x401B60, 6, reinterpret_cast<void*>(&RegisterGlueCVarsCustom)));
+
+    FillCustomGlueCVarVector();
+#endif
+}
+
+namespace AscCamera { const AscClientOptions::CVarSpec* CVars(size_t& count); }
+
+void CVar::RegisterWorldQueue()
+{
+    {
+        size_t camCount = 0;   // FUN_1019c510's camera CVars
+        const AscClientOptions::CVarSpec* cams = AscCamera::CVars(camCount);
+        for (size_t i = 0; i < camCount; ++i)
+            Register(cams[i].name, nullptr, cams[i].flags, cams[i].defaultValue, cams[i].callback, cams[i].category, false, 0, false);
+    }
+    size_t optCount = 0;
+    const AscClientOptions::CVarSpec* opts = AscClientOptions::CVars(optCount);
+    for (size_t i = 0; i < optCount; ++i)
+    {
+        const intptr_t cvar = Register(opts[i].name, nullptr, opts[i].flags, opts[i].defaultValue, opts[i].callback, opts[i].category, false, 0, false);
+        if (opts[i].out)
+            *opts[i].out = reinterpret_cast<void*>(cvar);
+    }
+    // 0x10114090: each queued entry's CVar* goes back into its output slot, every time this runs.
+    size_t queuedCount = 0;
+    const AscClientOptions::CVarSpec* queued = AscClientOptions::QueuedWorldCVars(queuedCount);
+    for (size_t i = 0; i < queuedCount; ++i)
+    {
+        const intptr_t cvar = Register(queued[i].name, queued[i].help, queued[i].flags, queued[i].defaultValue, queued[i].callback,
+                                      queued[i].category, queued[i].a7, 0, false);
+        if (queued[i].out)
+            *queued[i].out = reinterpret_cast<void*>(cvar);
+    }
+}
+
+// (aoeRadiusIndicator* / showQuestUnitCircles are the unit-select module's, queued exactly by AscUnitSelect.cpp.)
+// FUN_10114180: the client's glue CVars first, then every queued one (0x10BDD1AC..) as
+// 0x767FC0(name, help, flags, default, callback, category, a7, 0, 0).
+int32_t CVar::RegisterGlueCVarsCustom()
+{
+    const int32_t r = g_401B60();
+
+    auto& customCVars = sDC.GetGlueCVarVector();
+    for (auto& it : customCVars)
+        Register(it.m_name, it.m_description, it.m_size, it.m_defaultValue, it.m_callback, it.m_flags, it.m_a7, 0, false);
+
+    return r;
+}
+
+intptr_t CVar::Register(const char* name, const char* description, uint32_t size, const char* defaultVal, void* callback, uint32_t flags, bool a7, intptr_t a8, bool a9)
+{
+    // x64: os callbacks ficam ligados. Auditoria de 01/11 (out/x64-32-cvar-callbacks.md): todos os 55 tem a forma
+    // (CVar*, const char*, const char*, void*) -> int 0/1 (o cliente le bool = AL), offsets de CVar em ASC_OFF e
+    // escrita de codigo por WriteCodeX64 com expect. Lista negra vazia; mistDensity/overrideDayProgress ficam
+    // ligados, mas inertes no x64 (as leituras do cliente sao rip-relativo -- pendente no fonte do cliente).
+    return reinterpret_cast<intptr_t (__cdecl*)(const char*, const char*, uint32_t, const char*, void*, uint32_t, bool, intptr_t, bool)>(ASC_PTR(0x767FC0))(name, description, size, defaultVal, callback, flags, a7, a8, a9);
+}
+
+void CVar::Set(CVar* cVar, int32_t value, bool a3, bool a4, bool a5, bool a6)
+{
+    reinterpret_cast<void (__thiscall*)(void*, int32_t, bool, bool, bool, bool)>(ASC_PTR(0x766940))(cVar, value, a3, a4, a5, a6);
+}
+
+CVar* CVar::Lookup(const char* name)
+{
+    return reinterpret_cast<CVar* (__cdecl*)(const char*)>(ASC_PTR(0x767440))(name);
+}
+
+int __cdecl AscCursor_SizePreferred(void*, const char*, const char*, void*);   // AscCursor.cpp
+void* AscRaidVideo_Callback();                                                // AscRaidVideo.cpp
+const char* AscRaidVideo_Name(size_t i, const char** defaultValue);
+
+void CVar::FillCustomGlueCVarVector()
+{
+    // CVars Ascension's SharedXML options panels expect (OptionsPanelTemplates.lua:391 "Couldn't find CVar").
+    // Stock 12340 does not register these at glue time. Category/size args mirror stock registrations.
+    // The raid video settings module (FUN_102dc960 -> FUN_101145c0 x12, AscRaidVideo.cpp): no help, flags 1,
+    // category 1, callback FUN_102dcdb0; useRaidVideoSettings "0" then the eleven <name>_raid.
+    AddToGlueCVarVector("useRaidVideoSettings", nullptr, 1, "0", AscRaidVideo_Callback(), 1, false, 0, false);
+    {
+        const char* def = nullptr;
+        for (size_t i = 0; const char* name = AscRaidVideo_Name(i, &def); ++i)
+            AddToGlueCVarVector(name, nullptr, 1, def, AscRaidVideo_Callback(), 1, false, 0, false);
+    }
+    // The AddOn-taint module (FUN_10312150 -> FUN_101145c0, storage 0x10BE3F7C): no help, flags 1,
+    // default "1", no callback, category 5. At 0 the addon-load hook (AscAddonTaint, 0x5F7E90) refuses
+    // addons the server does not list.
+    AddToGlueCVarVector("loadUnknownAddOns", nullptr, 1, "1", nullptr, 5, false, 0, false);
+    // FUN_10114540 registrations -- C_SuperTrack's VisitedSuperTracks, C_Manastorm's
+    // manastormObjectiveIconCulling, the nameplate module's twelve and fourteen of the render module's --
+    // are queued by their modules and registered after world load (RegisterWorldQueue).
+    // The render module's five FUN_101145c0 CVars (FUN_10265d20): no help, flags 1, category 1, with the
+    // original's callbacks.
+    size_t gfxCount = 0;
+    const AscGraphics::CVarSpec* gfx = AscGraphics::CVars(gfxCount);
+    for (size_t i = 0; i < gfxCount; ++i)
+        if (!gfx[i].worldList)
+            AddToGlueCVarVector(gfx[i].name, nullptr, 1, gfx[i].defaultValue, gfx[i].callback, 1, gfx[i].a7, 0, false);
+    // The attach init's option CVars (FUN_10a66100 -> FUN_10114540), with the original's flags, defaults,
+    // categories and callbacks. They replace the placeholders the sweeps had registered for them.
+    // (Registered by RegisterWorldQueue, after 0x51D9B0, like the original.)
+    // C_Logger's level gates (FUN_101141e0): no help, flags 1, default "1", no callback, category 5.
+    AddToGlueCVarVector("logDebug", nullptr, 1, "1", nullptr, 5, false, 0, false);
+    AddToGlueCVarVector("logInfo", nullptr, 1, "1", nullptr, 5, false, 0, false);
+    // The cursor module's size (FUN_10a1e950 -> FUN_101145c0, storage 0x10D3C79C): no help, flags 1,
+    // default "0", category 1, callback FUN_10a1e320 (AscCursor.cpp).
+    AddToGlueCVarVector("cursorSizePreferred", nullptr, 1, "0", reinterpret_cast<void*>(&AscCursor_SizePreferred), 1, false, 0, false);
+    // Nothing else. The 2026-09-22/23 "sweeps" (154 names the UI reads, mostly with invented "0" defaults) and
+    // tutorialLevel were removed on 2026-09-27: 59 of them do not exist in the original client at all, and the
+    // rest are created there by the UI's own Lua or from saved Config.wtf lines, not by the DLL (live audit,
+    // tools/live_audit.py; the DLL's 93 are the exact registrations above).
+}
+
+void CVar::AddToGlueCVarVector(const char* name, const char* description, uint32_t size, const char* defaultVal, void* callback, uint32_t flags, bool a7, int32_t a8, bool a9)
+{
+    CustomCVar temp{ name, description, size, defaultVal, callback, flags, a8, a7, a9 };
+
+    sDC.GetGlueCVarVector().push_back(temp);
+}

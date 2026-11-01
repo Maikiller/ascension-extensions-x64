@@ -1,0 +1,3 @@
+# extra-addr exigido por x64-addontaint-5f7e90.diff (Hook5F7E90: retorno dos calls de IsAddOnLoadable)
+0x5F8076 @0x38A884   # LoadAddOnFileCount+0xB4, retorno do 2o call IsAddOnLoadable (o do addon->m_key)
+0x5F80FF @0x38A170   # LoadAddOn+0x80, retorno do call IsAddOnLoadable

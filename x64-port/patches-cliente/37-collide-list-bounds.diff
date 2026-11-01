@@ -1,0 +1,96 @@
+diff --git a/WoW/Source/WorldClient/Map.cpp b/WoW/Source/WorldClient/Map.cpp
+index b055f19..d0a66da 100644
+--- a/WoW/Source/WorldClient/Map.cpp
++++ b/WoW/Source/WorldClient/Map.cpp
+@@ -214,6 +214,18 @@ int32_t CMap::s_useSSE;
+ // STATIC: 0x00CF4928
+ TSGrowableArray<uint32_t> CMap::scCollideList;
+ 
++#if defined(_WIN64)
++// CoA x64 (patch 37): o x86 reserva 2048 entradas (1024 celulas de subchunk ~ 4266 jardas) e so o DX/DY param em
++// 0x7FC; o SX/SY (raio paralelo a um eixo) nao tem limite. Com farclip > ~4266 (/vista 6000) o raio reto estoura o
++// array e pisa no heap vizinho (bateria 01/11 01:41, rodada 20261101-014126: 0x2488 bytes escritos num bloco de
++// 0x2000, o m_data de um CM2Shared ao lado virou lixo e o ~CM2Shared caiu no laco de m_textures). Aqui o array cobre
++// o farclip maximo do x64 (50000 jardas na diagonal ~ 34000 entradas) e os quatro rasterizadores param no limite.
++#define COLLIDE_LIST_SIZE 0x10000u
++#else
++#define COLLIDE_LIST_SIZE 2048u
++#endif
++#define COLLIDE_LIST_LIMIT (COLLIDE_LIST_SIZE - 4)
++
+ // STATIC: 0x00D253A4
+ int32_t CMap::freeCounts[11];
+ 
+@@ -701,7 +713,7 @@ void CMap::Initialize() {
+         CMap::m_areaInfo[i].m_flags = 0;
+     }
+ 
+-    CMap::scCollideList.SetCount(2048);
++    CMap::scCollideList.SetCount(COLLIDE_LIST_SIZE);
+ 
+     CMap::cCount = 0;
+     CMap::s_queryTag = 0;
+@@ -1015,12 +1027,22 @@ void CMap::VectorIntersectSX(CiRect& rect) {
+ 
+     if (x <= rect.maxX) {
+         do {
++#if defined(_WIN64)
++            if (CMap::cCount >= COLLIDE_LIST_LIMIT) {
++                return;
++            }
++#endif
+             CMap::scCollideList.m_data[CMap::cCount++] = x;
+             CMap::scCollideList.m_data[CMap::cCount++] = rect.minY;
+             x++;
+         } while (x <= rect.maxX);
+     } else {
+         do {
++#if defined(_WIN64)
++            if (CMap::cCount >= COLLIDE_LIST_LIMIT) {
++                return;
++            }
++#endif
+             CMap::scCollideList.m_data[CMap::cCount++] = x;
+             CMap::scCollideList.m_data[CMap::cCount++] = rect.minY;
+             x--;
+@@ -1035,12 +1057,22 @@ void CMap::VectorIntersectSY(CiRect& rect) {
+ 
+     if (y <= rect.maxY) {
+         do {
++#if defined(_WIN64)
++            if (CMap::cCount >= COLLIDE_LIST_LIMIT) {
++                return;
++            }
++#endif
+             CMap::scCollideList.m_data[CMap::cCount++] = rect.minX;
+             CMap::scCollideList.m_data[CMap::cCount++] = y;
+             y++;
+         } while (y <= rect.maxY);
+     } else {
+         do {
++#if defined(_WIN64)
++            if (CMap::cCount >= COLLIDE_LIST_LIMIT) {
++                return;
++            }
++#endif
+             CMap::scCollideList.m_data[CMap::cCount++] = rect.minX;
+             CMap::scCollideList.m_data[CMap::cCount++] = y;
+             y--;
+@@ -1073,7 +1105,7 @@ void CMap::VectorIntersectDX(C3Vector& start, C3Vector& end, CiRect& cells) {
+     CMap::scCollideList.m_data[CMap::cCount++] = y;
+ 
+     while (x != cells.maxX + step) {
+-        if (CMap::cCount >= 0x7FC) {
++        if (CMap::cCount >= COLLIDE_LIST_LIMIT) {
+             return;
+         }
+ 
+@@ -1125,7 +1157,7 @@ void CMap::VectorIntersectDY(C3Vector& start, C3Vector& end, CiRect& cells) {
+     CMap::scCollideList.m_data[CMap::cCount++] = cells.minY;
+ 
+     while (y != cells.maxY + step) {
+-        if (CMap::cCount >= 0x7FC) {
++        if (CMap::cCount >= COLLIDE_LIST_LIMIT) {
+             return;
+         }
+ 

@@ -1,0 +1,396 @@
+diff --git a/src/Ascension/AscCAMgr.cpp b/src/Ascension/AscCAMgr.cpp
+index b6ae930..533fa17 100644
+--- a/src/Ascension/AscCAMgr.cpp
++++ b/src/Ascension/AscCAMgr.cpp
+@@ -5321,7 +5321,7 @@ namespace
+     // CA entry (FUN_101498d0 over the spell's first rank) lists point requirements (+0x1D8 class, +0x1E4
+     // tab, +0x1F0 points, up to three, the first zero ends them), the active non-wildcard build must meet
+     // each (FUN_101552e0 with no minimum).
+-    bool __cdecl CastRequirements(uint32_t unit, uint32_t rec, uint32_t, uint32_t, uint32_t)
++    bool __cdecl CastRequirements(uintptr_t unit, uintptr_t rec, uintptr_t, uintptr_t, uint32_t)
+     {
+         if (!reinterpret_cast<char(__thiscall*)(void*)>(ASC_PTR(0x4CEE50))(reinterpret_cast<void*>(unit)))
+             return true;
+diff --git a/src/Ascension/AscLibrary.cpp b/src/Ascension/AscLibrary.cpp
+index efa4662..e12840d 100644
+--- a/src/Ascension/AscLibrary.cpp
++++ b/src/Ascension/AscLibrary.cpp
+@@ -38,8 +38,8 @@ namespace
+             return 0;
+         g_loaded.push_back(name);
+         const std::string path = "Interface\\LibraryXML\\" + name + ".toc";
+-        uint32_t* taint = reinterpret_cast<uint32_t*>(ASC_PTR(0xD4139C));
+-        const uint32_t saved = *taint;
++        uintptr_t* taint = reinterpret_cast<uintptr_t*>(ASC_PTR(0xD4139C));   // lua_tainted (const char*)
++        const uintptr_t saved = *taint;
+         auto untaint = []() { return *reinterpret_cast<const uint32_t*>(ASC_PTR(0xD413A0)) != 0 && *reinterpret_cast<const uint8_t*>(ASC_PTR(0xD413A4)) == 0; };
+         if (untaint())
+             *taint = 0;
+diff --git a/src/Ascension/AscRuntime.cpp b/src/Ascension/AscRuntime.cpp
+index ae9c994..18306c4 100644
+--- a/src/Ascension/AscRuntime.cpp
++++ b/src/Ascension/AscRuntime.cpp
+@@ -45,11 +45,20 @@ namespace
+     }
+ 
+     // 0x403340 begins push ebp / mov ebp,esp / push esi / mov esi,[ebp+8]: seven bytes.
++#if ASC_X64
++    // x64: ClientIdle(const void*, void*) -- os dois argumentos seguem para o original
++    typedef int(__cdecl* Fn403340_t)(void*, void*);
++    Fn403340_t g_403340Trampoline = nullptr;
++    int __cdecl Detour403340(void* p, void* q)
++    {
++        const int r = g_403340Trampoline(p, q);
++#else
+     typedef int(__cdecl* Fn403340_t)(void*);
+     Fn403340_t g_403340Trampoline = nullptr;
+     int __cdecl Detour403340(void* p)
+     {
+         const int r = g_403340Trampoline(p);
++#endif
+         for (Callback cb : After403340List())
+             cb();
+         return r;
+@@ -57,9 +66,15 @@ namespace
+ 
+     // 0x495810 begins push ebp / mov ebp,esp / fld dword [ebp+0x14]: six bytes.
+     std::vector<Callback>& After495810List() { static std::vector<Callback> v; return v; }
++#if ASC_X64
++    typedef int(__cdecl* Fn495810_t)(void*, void*, void*, float);   // x64: o float vai em xmm3
++    Fn495810_t g_495810Trampoline = nullptr;
++    int __cdecl Detour495810(void* a, void* b, void* c, float d)
++#else
+     typedef int(__cdecl* Fn495810_t)(void*, void*, void*, uint32_t);   // 4th = float dt, passed through as bits
+     Fn495810_t g_495810Trampoline = nullptr;
+     int __cdecl Detour495810(void* a, void* b, void* c, uint32_t d)
++#endif
+     {
+         const int r = g_495810Trampoline(a, b, c, d);
+         for (Callback cb : After495810List())
+@@ -73,6 +88,14 @@ namespace
+     std::vector<Callback>& LeaveWorldList() { static std::vector<Callback> v; return v; }
+     void __cdecl RunLeaveWorld() { for (Callback cb : LeaveWorldList()) cb(); }
+     void* g_528C30Trampoline = nullptr;
++#if ASC_X64
++    // x64: LeaveWorld() nao tem argumento -- detour C comum (MinHook) no lugar do naked
++    void __cdecl Detour528C30()
++    {
++        RunLeaveWorld();
++        reinterpret_cast<void(__cdecl*)()>(g_528C30Trampoline)();
++    }
++#endif
+     #if !ASC_X64
+     __declspec(naked) void Detour528C30()
+     {
+@@ -95,6 +118,13 @@ namespace
+     std::vector<Callback>& Before528F00List() { static std::vector<Callback> v; return v; }
+     void __cdecl RunBefore528F00() { for (Callback cb : Before528F00List()) cb(); }
+     void* g_528F00Trampoline = nullptr;
++#if ASC_X64
++    void __cdecl Detour528F00()   // x64: Shutdown()
++    {
++        RunBefore528F00();
++        reinterpret_cast<void(__cdecl*)()>(g_528F00Trampoline)();
++    }
++#endif
+     #if !ASC_X64
+     __declspec(naked) void Detour528F00()
+     {
+@@ -114,6 +144,15 @@ namespace
+     // detour makes that call itself and continues at 0x402915; then list 0x10BE2A8C.
+     std::vector<Callback>& After402910List() { static std::vector<Callback> v; return v; }
+     void __cdecl RunAfter402910() { for (Callback cb : After402910List()) cb(); }
++#if ASC_X64
++    // x64: WowClientDestroy() -- o MinHook realoca o call inicial; a lista roda depois do original
++    void* g_402910Trampoline = nullptr;
++    void __cdecl Detour402910()
++    {
++        reinterpret_cast<void(__cdecl*)()>(g_402910Trampoline)();
++        RunAfter402910();
++    }
++#endif
+     #if !ASC_X64
+     __declspec(naked) void Detour402910()
+     {
+@@ -190,9 +229,9 @@ namespace
+     // sub esp,0x2D0: nine bytes. The original's detour 0x10A42F30 runs the original, then branches on
+     // the item's entry (mystic scroll -> FUN_102EA3A0, preset unlock token -> FUN_102EA330, ...).
+     std::vector<ObjectCallback>& ItemUseList() { static std::vector<ObjectCallback> v; return v; }
+-    typedef int(__thiscall* Fn708C20_t)(void*, int, int);
++    typedef int(__thiscall* Fn708C20_t)(void*, intptr_t, int);   // a = WOWGUID* no x64
+     Fn708C20_t g_708C20Trampoline = nullptr;
+-    int __fastcall Detour708C20(void* item ASC_EDX_P(void*), int a, int b)
++    int __fastcall Detour708C20(void* item ASC_EDX_P(void*), intptr_t a, int b)
+     {
+         const int r = g_708C20Trampoline(item, a, b);
+         for (ObjectCallback cb : ItemUseList())
+@@ -203,9 +242,9 @@ namespace
+     // 0x743EC0 (__thiscall(object, a), ret 4) begins push ebp / mov ebp,esp / push esi / mov esi,ecx:
+     // six bytes. The original's detour 0x10275E50 runs the original, then list 0x10BE2CF8 with the object.
+     std::vector<ObjectCallback>& After743EC0List() { static std::vector<ObjectCallback> v; return v; }
+-    typedef int(__thiscall* Fn743EC0_t)(void*, int);
++    typedef int(__thiscall* Fn743EC0_t)(void*, intptr_t);   // a = CGWorldFrame*
+     Fn743EC0_t g_743EC0Trampoline = nullptr;
+-    int __fastcall Detour743EC0(void* object ASC_EDX_P(void*), int a)
++    int __fastcall Detour743EC0(void* object ASC_EDX_P(void*), intptr_t a)
+     {
+         const int r = g_743EC0Trampoline(object, a);
+         for (ObjectCallback cb : After743EC0List())
+@@ -218,17 +257,57 @@ namespace
+     // 0xBD0791 is set: list 0x10BE2950 (FUN_10278390), the original, then -- for a unit target that is
+     // not flagged 0x10 and whose +0x10C / +0x110 differ -- its 0x616B10 record, looked up in 0xC5CE30
+     // (0x6F6020) gets +0x18 = 1 and 0x512B50(&guid, 3) runs; last, list 0x10BE2970 (FUN_10278330).
++#if ASC_X64
++    // x64: o 0x6F6020 do x86 e o TSHashTable::Ptr dobrado (ICF) que no WowClient64 foi inlinado -- a busca em
++    // s_unitPortraits (0xC5CE30, TSHashTable<UNITPORTRAIT, HASHKEY_DWORD>) vai aqui com o layout x64 do PDB:
++    // m_slotlistarray.m_data +0x30, m_slotmask +0x40; lista: m_linkoffset +0, m_terminator.m_next +0x10;
++    // no: m_hashval +0, link +linkoffset (m_next +8), m_key +0x28, m_cache.m_dirty +0x30 (x86: +0x18).
++    // Depois marca o retrato sujo e chama CGGameUI::UnitModelUpdate(guid, 3), como o x86.
++    void RefreshPortraitX64(uint8_t* unit, const uint8_t* desc)
++    {
++        const uint32_t displayId = reinterpret_cast<uint32_t(__thiscall*)(void*)>(ASC_PTR(0x616B10))(unit);
++        uint8_t* table = static_cast<uint8_t*>(ASC_PTR(0xC5CE30));
++        if (!displayId || !table)
++            return;
++        const uint32_t mask = *reinterpret_cast<const uint32_t*>(table + 0x40);
++        uint8_t* lists = *reinterpret_cast<uint8_t**>(table + 0x30);
++        if (mask == 0xFFFFFFFF || !lists)
++            return;
++        uint8_t* list = lists + static_cast<size_t>(displayId & mask) * 0x18;
++        const intptr_t linkOffset = *reinterpret_cast<const intptr_t*>(list);
++        for (uint8_t* node = *reinterpret_cast<uint8_t**>(list + 0x10); node && !(reinterpret_cast<uintptr_t>(node) & 1);
++             node = *reinterpret_cast<uint8_t**>(node + linkOffset + 8))
++        {
++            if (*reinterpret_cast<const uint32_t*>(node) != displayId || *reinterpret_cast<const uint32_t*>(node + 0x28) != displayId)
++                continue;
++            node[0x30] = 1;
++            uint64_t guid = *reinterpret_cast<const uint64_t*>(desc);
++            if (guid)
++                reinterpret_cast<void(__cdecl*)(uint64_t*, int)>(ASC_PTR(0x512B50))(&guid, 3);
++            return;
++        }
++    }
++#endif
+     std::vector<Callback>& BeforeTargetList() { static std::vector<Callback> v; return v; }
+     std::vector<Callback>& AfterTargetList() { static std::vector<Callback> v; return v; }
+-    typedef void(__cdecl* Fn524BF0_t)(uint32_t, uint32_t);
++    typedef void(__cdecl* Fn524BF0_t)(ASC_GUID2_T);
+     Fn524BF0_t g_524BF0Trampoline = nullptr;
+-    void __cdecl Detour524BF0(uint32_t lo, uint32_t hi)
++    void __cdecl Detour524BF0(ASC_GUID2_P(lo, hi))
+     {
+         if (*reinterpret_cast<const uint8_t*>(ASC_PTR(0xBD0791)) != 0)
+             return;
+         for (Callback cb : BeforeTargetList())
+             cb();
+-        g_524BF0Trampoline(lo, hi);
++        g_524BF0Trampoline(ASC_GUID2_A(lo, hi));
++#if ASC_X64
++        if (lo)
++            if (uint8_t* unit = static_cast<uint8_t*>(AscScript::ObjectPtr(lo, 8)))
++            {
++                const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(unit + 0x10);
++                if (!(desc[8] & 0x10) && *reinterpret_cast<const uint32_t*>(desc + 0x10C) != *reinterpret_cast<const uint32_t*>(desc + 0x110))
++                    RefreshPortraitX64(unit, desc);
++            }
++#else
+         if (lo | hi)
+         {
+             uint8_t* unit = static_cast<uint8_t*>(AscScript::ObjectPtr(AscX64::Guid(lo, hi), 8));
+@@ -246,6 +325,7 @@ namespace
+                         }
+             }
+         }
++#endif
+         for (Callback cb : AfterTargetList())
+             cb();
+     }
+@@ -306,9 +386,9 @@ namespace
+     // 0x80B5D0 (__cdecl, 5 arguments, bool; 6 bytes). The original's detour 0x10277900 (hook object
+     // 0x10BCB680): the original, and when it returned true, list 0x10BE2DD8 until a callback says false.
+     std::vector<std::pair<uint32_t, CastVeto>>& After80B5D0List() { static std::vector<std::pair<uint32_t, CastVeto>> v; return v; }
+-    typedef int(__cdecl* Fn80B5D0_t)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
++    typedef int(__cdecl* Fn80B5D0_t)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uint32_t);   // 4 ponteiros + bool
+     Fn80B5D0_t g_80B5D0Trampoline = nullptr;
+-    int __cdecl Detour80B5D0(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e)
++    int __cdecl Detour80B5D0(uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uint32_t e)
+     {
+         if (!(g_80B5D0Trampoline(a, b, c, d, e) & 0xFF))
+             return 0;
+@@ -448,6 +528,22 @@ namespace
+     const uint32_t kEnterWorld = 0x528010;   // hooked 0x528010
+     const uint32_t kEnterWorldPrologue = 6;
+     void* g_enterWorldTrampoline = nullptr;
++#if ASC_X64
++    void __cdecl EnterWorldDetour()   // x64: EnterWorld() sem argumento
++    {
++        RunEnterWorld();
++        reinterpret_cast<void(__cdecl*)()>(g_enterWorldTrampoline)();
++        RunAfterEnterWorld();
++    }
++    // x64: a cave do epilogo (0x4DA9AC) vira detour do CGlueMgr::Resume inteiro (0x4DA5F0): no x86 as duas
++    // saidas (alerta do servidor / ClientPostClose) caem no mesmo epilogo, entao a lista roda apos qualquer retorno.
++    void* g_resumeTrampoline = nullptr;
++    void __cdecl ResumeDetour()
++    {
++        reinterpret_cast<void(__cdecl*)()>(g_resumeTrampoline)();
++        RunGlueScreen();
++    }
++#endif
+ 
+     // The original's detour (0x10275c10): run the pre list, the original with ecx/edx intact, then
+     // the post list. 0x528010 takes no stack arguments and returns with a plain ret, so calling it
+@@ -578,7 +674,7 @@ namespace
+                 if (type < 0x16E)
+                     g_auraTypes[unit][type >> 5] |= 1u << (type & 0x1F);
+                 if (type < 0x140)
+-                    unit[0xF20 + (type >> 3)] |= static_cast<uint8_t>(1u << (type & 7));
++                    unit[ASC_OFF(0xF20, 0x1770) + (type >> 3)] |= static_cast<uint8_t>(1u << (type & 7));
+             }
+         }
+     }
+@@ -589,9 +685,9 @@ namespace
+     // The original's detour (0x10276000) runs it, then -- for a unit whose descriptor lacks flag 0x10
+     // at +8 and whose +0x10C / +0x110 differ -- flags the client object 0x616B10 names (0x6F6020 on the
+     // manager 0xC5CE30, +0x18 = 1) and passes the unit's guid to 0x512B50 with 3 (FUN_10111d20).
+-    typedef int(__fastcall* Fn730290_t)(uint8_t* ASC_EDX_P(void*), uint32_t);
++    typedef int(__fastcall* Fn730290_t)(uint8_t* ASC_EDX_P(void*), uintptr_t);   // a = CDataStore*
+     Fn730290_t g_730290Trampoline = nullptr;
+-    int __fastcall Detour730290(uint8_t* unit ASC_EDX_P(void* edx), uint32_t a)
++    int __fastcall Detour730290(uint8_t* unit ASC_EDX_P(void* edx), uintptr_t a)
+     {
+         const int r = g_730290Trampoline(unit ASC_EDX_A(edx), a);
+         if (!unit)
+@@ -599,6 +695,9 @@ namespace
+         const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+         if ((d[8] & 0x10) || *reinterpret_cast<const uint32_t*>(d + 0x10C) == *reinterpret_cast<const uint32_t*>(d + 0x110))
+             return r;
++#if ASC_X64
++        RefreshPortraitX64(unit, d);
++#else
+         if (void* v = reinterpret_cast<void*(__thiscall*)(uint8_t*)>(ASC_PTR(0x616B10))(unit))
+             if (uint8_t* o = reinterpret_cast<uint8_t*(__thiscall*)(void*, void*, int)>(ASC_PTR(0x6F6020))(reinterpret_cast<void*>(ASC_PTR(0xC5CE30)), v, 0))
+             {
+@@ -607,6 +706,7 @@ namespace
+                 if (guid)
+                     reinterpret_cast<void(__cdecl*)(uint64_t*, int)>(ASC_PTR(0x512B50))(&guid, 3);
+             }
++#endif
+         return r;
+     }
+ 
+@@ -649,16 +749,16 @@ namespace
+         return r;
+     }
+ 
+-    typedef int(__cdecl* Fn494490_t)(const uint32_t*, uint32_t);
++    typedef int(__cdecl* Fn494490_t)(const uint32_t*, uintptr_t);   // b = void*
+     Fn494490_t g_494490 = nullptr, g_494530 = nullptr;
+-    int __cdecl Detour494490(const uint32_t* event, uint32_t b)
++    int __cdecl Detour494490(const uint32_t* event, uintptr_t b)
+     {
+         if (*reinterpret_cast<const uint8_t*>(ASC_PTR(0xBD0792)))
+             for (auto cb : g_before494490)
+                 cb(event);
+         return g_494490(event, b);
+     }
+-    int __cdecl Detour494530(const uint32_t* event, uint32_t b)
++    int __cdecl Detour494530(const uint32_t* event, uintptr_t b)
+     {
+         if (*reinterpret_cast<const uint8_t*>(ASC_PTR(0xBD0792)))
+             for (auto cb : g_before494530)
+@@ -686,9 +786,9 @@ namespace
+     }
+ 
+     std::vector<void (*)(const uint32_t*)>& Before4943C0List() { static std::vector<void (*)(const uint32_t*)> v; return v; }
+-    typedef int(__cdecl* Fn4943C0_t)(const uint32_t*, uint32_t);
++    typedef int(__cdecl* Fn4943C0_t)(const uint32_t*, uintptr_t);   // b = void*
+     Fn4943C0_t g_4943C0Trampoline = nullptr;
+-    int __cdecl Detour4943C0(const uint32_t* event, uint32_t b)
++    int __cdecl Detour4943C0(const uint32_t* event, uintptr_t b)
+     {
+         if (*reinterpret_cast<const uint8_t*>(ASC_PTR(0xBD0792)))
+             for (auto cb : Before4943C0List())
+@@ -894,7 +994,46 @@ void InstallHooks()
+     // assinatura conferida contra tools/protos.py. Marco 2a: nenhum.
+     // portados: tabela de eventos (nomes custom do CoA na glue e no mundo)
+     g_registerEvents = reinterpret_cast<RegisterEvents_t>(Detour(0x81B5F0, 5, reinterpret_cast<void*>(&RegisterEventsDetour)));
+-    AscLog::Printf("AscRuntime: x64 -- portado: eventos (0x81B5F0); demais hooks do runtime pendentes");
++    // Marco 2b (projects-6a): assinaturas conferidas contra out/protos.json. Fora: 0x73F660 (sem proto, lista
++    // sem registrante) e 0x6ECF80 (Teleport, decisao anterior). O 0x6F6020 (Ptr de retrato, inlinado no x64)
++    // virou RefreshPortraitX64.
++#define ASC_RT_HOOK(var, addr, fn) var = reinterpret_cast<decltype(var)>(Detour(addr, 0, reinterpret_cast<void*>(&fn)))
++    ASC_RT_HOOK(g_402B20, 0x402B20, Detour402B20);
++    ASC_RT_HOOK(g_494490, 0x494490, Detour494490);
++    ASC_RT_HOOK(g_494530, 0x494530, Detour494530);
++    ASC_RT_HOOK(g_80FEE0, 0x80FEE0, Detour80FEE0);
++    ASC_RT_HOOK(g_enterWorldTrampoline, 0x528010, EnterWorldDetour);
++    ASC_RT_HOOK(g_resumeTrampoline, 0x4DA5F0, ResumeDetour);
++    ASC_RT_HOOK(g_dispatchTrampoline, 0x81AA00, DispatchDetour);
++    ASC_RT_HOOK(g_403340Trampoline, 0x403340, Detour403340);
++    ASC_RT_HOOK(g_495810Trampoline, 0x495810, Detour495810);
++    ASC_RT_HOOK(g_6FC0F0Trampoline, 0x6FC0F0, Detour6FC0F0);
++    ASC_RT_HOOK(g_6DF050Trampoline, 0x6DF050, Detour6DF050);
++    ASC_RT_HOOK(g_70F680Trampoline, 0x70F680, Detour70F680);
++    ASC_RT_HOOK(g_708C20Trampoline, 0x708C20, Detour708C20);
++    ASC_RT_HOOK(g_743EC0Trampoline, 0x743EC0, Detour743EC0);
++    ASC_RT_HOOK(g_5204C0Trampoline, 0x5204C0, Detour5204C0);
++    ASC_RT_HOOK(g_4F6F90Trampoline, 0x4F6F90, Detour4F6F90);
++    ASC_RT_HOOK(g_52A980Trampoline, 0x52A980, Detour52A980);
++    ASC_RT_HOOK(g_524BF0Trampoline, 0x524BF0, Detour524BF0);
++    ASC_RT_HOOK(g_724820Trampoline, 0x724820, Detour724820);
++    ASC_RT_HOOK(g_71E930Trampoline, 0x71E930, Detour71E930);
++    ASC_RT_HOOK(g_80B5D0Trampoline, 0x80B5D0, Detour80B5D0);
++    ReplaceFunction(0x744AC0, reinterpret_cast<void*>(&Replace744AC0));
++    OnAfter403340(&Sweep);
++    ASC_RT_HOOK(g_528C30Trampoline, 0x528C30, Detour528C30);
++    ASC_RT_HOOK(g_528F00Trampoline, 0x528F00, Detour528F00);
++    ASC_RT_HOOK(g_402910Trampoline, 0x402910, Detour402910);
++    ReplaceFunction(0x727E70, reinterpret_cast<void*>(&Replace727E70));
++    ASC_RT_HOOK(g_6E7F50Trampoline, 0x6E7F50, Detour6E7F50);
++    ASC_RT_HOOK(g_4943C0Trampoline, 0x4943C0, Detour4943C0);
++    ASC_RT_HOOK(g_730290Trampoline, 0x730290, Detour730290);
++#undef ASC_RT_HOOK
++    OnObjectFree(&EraseAuraTypes);
++    OnLeaveWorld(&ClearAuraTypes);
++    OnBefore528F00(&ClearAuraTypes);
++    OnAfter402910(&ClearAuraTypes);
++    AscLog::Printf("AscRuntime: x64 -- 28 detours + 2 substituicoes do runtime instalados (eventos, ciclo de vida, auras, teclas, alvo)");
+     return;
+ #else
+     g_402B20 = reinterpret_cast<Fn402B20_t>(Detour(0x402B20, 9, reinterpret_cast<void*>(&Detour402B20)));
+diff --git a/src/Ascension/AscRuntime.hpp b/src/Ascension/AscRuntime.hpp
+index 04d327f..33d4941 100644
+--- a/src/Ascension/AscRuntime.hpp
++++ b/src/Ascension/AscRuntime.hpp
+@@ -134,7 +134,7 @@ namespace AscRuntime
+     typedef bool (__cdecl* VisualHide)(uint32_t kind, uint32_t guidLo, uint32_t guidHi, uint32_t spell);
+     void OnVisualHide(VisualHide cb, uint32_t site);
+     bool VisualHidden(uint32_t kind, uint32_t guidLo, uint32_t guidHi, uint32_t spell);   // FUN_10277870
+-    typedef bool (__cdecl* CastVeto)(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e);
++    typedef bool (__cdecl* CastVeto)(uintptr_t unit, uintptr_t rec, uintptr_t guid, uintptr_t item, uint32_t e);   // 0x80B5D0
+     void OnAfter80B5D0(CastVeto cb, uint32_t site);
+ 
+     // The DLL's hook manager (FUN_100010f0) over a stock packet handler (a, opcode, time, packet): the
+diff --git a/src/Ascension/AscSpellMods.cpp b/src/Ascension/AscSpellMods.cpp
+index dba57f2..cb1a6b9 100644
+--- a/src/Ascension/AscSpellMods.cpp
++++ b/src/Ascension/AscSpellMods.cpp
+@@ -176,7 +176,7 @@ namespace
+     // 0x103267E0 (after 0x80B5D0): a spell flagged SpellCustomAttr +0x18 & 0x2000 with a required aura
+     // spell (+0x60) needs the unit's aura of that spell (0x7289C0 slot, 0x556E10) at +0xE stacks >= the
+     // required spell's StackAmount (+0xC4). An unknown required spell or missing aura vetoes.
+-    bool __cdecl StackRequirement(uint32_t unitArg, uint32_t recArg, uint32_t, uint32_t, uint32_t)
++    bool __cdecl StackRequirement(uintptr_t unitArg, uintptr_t recArg, uintptr_t, uintptr_t, uint32_t)
+     {
+         void* unit = reinterpret_cast<void*>(unitArg);
+         const uint8_t* rec = reinterpret_cast<const uint8_t*>(recArg);
+@@ -199,7 +199,7 @@ namespace
+     }
+ 
+     // 0x10326780 (after 0x80B5D0): SpellCustomAttr +0x18 & 0x4000 needs aura 0xC3849 on the unit.
+-    bool __cdecl AuraRequirement(uint32_t unitArg, uint32_t recArg, uint32_t, uint32_t, uint32_t)
++    bool __cdecl AuraRequirement(uintptr_t unitArg, uintptr_t recArg, uintptr_t, uintptr_t, uint32_t)
+     {
+         const uint8_t* rec = reinterpret_cast<const uint8_t*>(recArg);
+         if (!rec)

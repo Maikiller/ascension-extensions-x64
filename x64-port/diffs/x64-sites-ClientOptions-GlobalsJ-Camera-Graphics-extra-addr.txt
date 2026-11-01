@@ -1,0 +1,36 @@
+0x80D7C1 @0x2A41F7   # Spell_C_CastSpell+0x877, je 74 08 (OnAutoAssistCast)
+0x80C91D @0x2A223E   # Spell_C_BeginCast+0x17E, or dword [rip],0x80 (OnAutoAssistCast)
+0x621766 @0x3B3CB1   # CGTooltip::SetUnit+0x801, jg 7F 04 (OnHideDangerousEnemyLevel)
+0x720E68 @0x2ECFED   # CGUnit_C::UpdateSpellCastBars+0x2D, jne do GUID (SetNamePlateCastBarMode)
+0x524DC1 @0x3E6784   # CGGameUI::Target+0x1F4, call OsGetAsyncTimeMs + UpdateSpellCastBars (15 bytes)
+0x524276 @0x3DA727   # CGGameUI::ClearTarget+0xA7, call StopNamePlateSpellbar (8 bytes)
+0x5FC6C8 @0x743C2D   # Script_CameraOrSelectOrMoveStart+0xD, xor ecx,ecx (CanPerformAction arg)
+0x5FC73B @0x743CC4   # Script_CameraOrSelectOrMoveStop+0x14, xor ecx,ecx
+0x5209A8 @0x3E49C1   # CGGameUI::SetCursorSpell, jne (Attack 0x4E)
+0x5209B8 @0x3E49CF   # CGGameUI::SetCursorSpell, je (ranged)
+0x53DC8A @0x3FAFED   # CGSpellBook::GetSpellTexture, jne
+0x53DCAC @0x3FAFFE   # CGSpellBook::GetSpellTexture, je
+0x540B66 @0x4A98DE   # Script_GetSpellInfo, jne
+0x540B76 @0x4A98EF   # Script_GetSpellInfo, je
+0x5FFD34 @0x393F61   # CGCamera::IsBobbingAllowed+0x21, ja 77 7D (OnActionCam/OnHeadBobs)
+0x72E870 @0x2DA47E   # CGUnit_C::OnTurnStartLocal+0x9E, jne 75 14 (OnEnemyFocus)
+0x72E5FE @0x2D8B97   # CGUnit_C::OnMoveStartLocal+0x37, jne 75 11
+0x72E6AE @0x2DA217   # CGUnit_C::OnStrafeStartLocal+0x37, jne 75 11
+0x5FBC80 @0x39CD6D   # CGInputControl::UpdatePlayer+0xFD, jne 75 0D
+0x727520 @0x2C2FD3   # CGPlayer_C::ClickToMove+0x153, movss [s_trackingTurnRate],xmm0 (OnTurnSpeed)
+0x731720 @0x2CECE7   # CGUnit_C::HandleTrackingFacing+0xF7, movss [s_trackingTurnRate],xmm0
+0x791E60 @0x51ED32   # CWorldScene::AddDoodadDefModelToModelScene+0x182, movss [rax+0x208],xmm6 (OnM2Collision)
+0x75697C @0x35A827   # Packet_Group_29+0x1D7, jne 75 16 (OnAutoTarget)
+0x806AA2 @0x29E7C6   # PendingSpellCast::OnSpellStart+0x376, jne 75 17
+0x79AA42 @0x5731E5   # CWorldScene::Render+0x275, jbe 76 0E (OnTerrainCulling)
+0x81E548 @0x13FD86   # CM2Scene::SelectLights+0x166, je 74 0C (OnLightCulling/OnLightAttenuation)
+0x7F1777 @0x53659F   # DayNight::UpdateFog+0xBF, movss [m_fog.m_density] S1 (OnFogDensity)
+0x7F19F4 @0x536895   # DayNight::UpdateFog+0x3B5, S4
+0x7F1A49 @0x5368CB   # DayNight::UpdateFog+0x3EB, S5 (m_fogInterior.m_density)
+0x7F1A13 @0x5368EA   # DayNight::UpdateFog+0x40A, S6
+0x7F1A1B @0x5368F2   # DayNight::UpdateFog+0x412, S7
+0x7ED982 @0x52E78D   # DayNight::CurrentLight::operator=+0x6D, mov [rcx+0x48],eax (OnFogDistance)
+0x7D8444 @0x57ACE7   # CMapObjGroup::Create+0x157, jne 75 08 (OnAntiportal)
+0x7D00BF @0x53F994   # CMapRenderChunk::SetVertexShader+0xB4, call GetPointLight -> jmp (OnLightLimitFix)
+0x791D6A @0x51EC52   # CWorldScene::AddDoodadDefModelToModelScene+0xA2, jb 0F 82 (OnLodObjectCull)
+0x9F3A88 @0x7A8600   # CGObject_C vtable slot 6 (ShouldFadeout), ponteiro de 8 bytes (SetFadeOutGameObjects)

@@ -1,0 +1,85 @@
+diff --git a/WoW/Source/WorldClient/CWorldOcclusion.cpp b/WoW/Source/WorldClient/CWorldOcclusion.cpp
+index f44ef62..9a740ba 100644
+--- a/WoW/Source/WorldClient/CWorldOcclusion.cpp
++++ b/WoW/Source/WorldClient/CWorldOcclusion.cpp
+@@ -670,6 +670,20 @@ void CWorldOccluder::Recycle() {
+     s_occluderFreeList.LinkToTail(this);
+ }
+ 
++// CoA: OcclusionVolumeData do Extensions.dll troca a tabela (ponteiro + quantidade) e marca s_occlusionVolumesInit.
++// No x64 o registro precisa do layout x64 de OcclusionVolume (m_data tem ponteiro); o ext grava o inicio da tabela (o x86 grava base+4). No x86 os macros dao o original.
++#if defined(_WIN64)
++// STATIC: 0x007CD8A0
++OcclusionVolume* g_coaOcclusionVolumes = s_occlusionVolumes;
++// STATIC: 0x007CD8A5
++uint32_t g_coaOcclusionVolumeCount = 62;
++#define COA_OCCLUSION_VOLUMES g_coaOcclusionVolumes
++#define COA_OCCLUSION_VOLUME_COUNT g_coaOcclusionVolumeCount
++#else
++#define COA_OCCLUSION_VOLUMES s_occlusionVolumes
++#define COA_OCCLUSION_VOLUME_COUNT 62
++#endif
++
+ // VERIFY: 23d792fd manual
+ // OFFSET: 0x007CCD20
+ static void InitOcclusionVolumes() {
+@@ -677,8 +691,8 @@ static void InitOcclusionVolumes() {
+         return;
+     }
+ 
+-    for (uint32_t i = 0; i < 62; i++) {
+-        OcclusionVolumeData& data = s_occlusionVolumes[i].m_data;
++    for (uint32_t i = 0; i < COA_OCCLUSION_VOLUME_COUNT; i++) {
++        OcclusionVolumeData& data = COA_OCCLUSION_VOLUMES[i].m_data;
+         const C3Vector* pos = data.m_positions;
+ 
+         for (int32_t j = 0; j < static_cast<int32_t>(data.m_positionCount); j++, pos++) {
+@@ -864,8 +878,8 @@ void CWorldScene::CreateOcclusionVolumes(const C3Vector* eye, const C3Vector* co
+     CFrustum frustum;
+     frustum.CalcPlanesFromCorners(corners);
+ 
+-    for (uint32_t i = 0; i < 62; i++) {
+-        OcclusionVolume& volume = s_occlusionVolumes[i];
++    for (uint32_t i = 0; i < COA_OCCLUSION_VOLUME_COUNT; i++) {
++        OcclusionVolume& volume = COA_OCCLUSION_VOLUMES[i];
+ 
+         if (s_mapId != volume.m_mapID || (onlyFlagged && !(volume.m_flags & 2))) {
+             continue;
+@@ -894,9 +908,9 @@ void CWorldScene::RenderOcclusionVolumes() {
+     int32_t vertexCount = 0;
+     int32_t indexCount = 0;
+ 
+-    for (uint32_t i = 0; i < 62; i++) {
+-        if (s_occlusionVolumes[i].m_mapID == s_mapId) {
+-            int32_t count = s_occlusionVolumes[i].m_data.m_positionCount;
++    for (uint32_t i = 0; i < COA_OCCLUSION_VOLUME_COUNT; i++) {
++        if (COA_OCCLUSION_VOLUMES[i].m_mapID == s_mapId) {
++            int32_t count = COA_OCCLUSION_VOLUMES[i].m_data.m_positionCount;
+             vertexCount += count;
+             indexCount += 3 * (count - 2);
+         }
+@@ -930,10 +944,10 @@ void CWorldScene::RenderOcclusionVolumes() {
+     CGxBuf* vertexBuf = g_theGxDevicePtr->BufStream(GxPoolTarget_Vertex, sizeof(CGxVertexPN), vertexCount);
+     CGxVertexPN* vertex = reinterpret_cast<CGxVertexPN*>(g_theGxDevicePtr->BufLock(vertexBuf));
+ 
+-    for (uint32_t i = 0; i < 62; i++) {
+-        OcclusionVolumeData& data = s_occlusionVolumes[i].m_data;
++    for (uint32_t i = 0; i < COA_OCCLUSION_VOLUME_COUNT; i++) {
++        OcclusionVolumeData& data = COA_OCCLUSION_VOLUMES[i].m_data;
+ 
+-        if (s_occlusionVolumes[i].m_mapID != s_mapId) {
++        if (COA_OCCLUSION_VOLUMES[i].m_mapID != s_mapId) {
+             continue;
+         }
+ 
+@@ -957,8 +971,8 @@ void CWorldScene::RenderOcclusionVolumes() {
+     uint16_t* indices = reinterpret_cast<uint16_t*>(g_theGxDevicePtr->BufLock(indexBuf));
+     int32_t base = 0;
+ 
+-    for (uint32_t i = 0; i < 62; i++) {
+-        OcclusionVolume& volume = s_occlusionVolumes[i];
++    for (uint32_t i = 0; i < COA_OCCLUSION_VOLUME_COUNT; i++) {
++        OcclusionVolume& volume = COA_OCCLUSION_VOLUMES[i];
+ 
+         if (volume.m_mapID != s_mapId) {
+             continue;

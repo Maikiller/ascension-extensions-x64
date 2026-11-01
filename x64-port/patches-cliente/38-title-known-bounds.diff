@@ -1,0 +1,19 @@
+diff --git a/WoW/Source/Ui/GameUI_Scripts.cpp b/WoW/Source/Ui/GameUI_Scripts.cpp
+index 39fc289..b4f5ee2 100644
+--- a/WoW/Source/Ui/GameUI_Scripts.cpp
++++ b/WoW/Source/Ui/GameUI_Scripts.cpp
+@@ -2972,6 +2972,14 @@ static int32_t Script_IsTitleKnown(lua_State* L) {
+     CGPlayer_C* player = static_cast<CGPlayer_C*>(ClntObjMgrObjectPtr(ClntObjMgrGetActivePlayer(), TYPE_PLAYER, __FILE__, __LINE__));
+     uint32_t mask = static_cast<uint32_t>(lua_tonumber(L, 1));
+ 
++#if defined(_WIN64)
++    // CoA x64: o original nao limita a mascara -- mask >= 192 le alem de m_playerFieldKnownTitles[3] (cai em
++    // m_playerFieldKnownCurrencies) e devolve 1 para um titulo sem registro; o GetTitleName dele da nil e o
++    // TitlesPanel do Ascension quebra no sort ("attempt to compare nil with string", mask 211 = moeda bit 19).
++    if (mask >= 64 * (sizeof(player->m_player->m_playerFieldKnownTitles) / sizeof(uint64_t))) {
++        mask = 0;
++    }
++#endif
+     if (player && mask && (player->m_player->m_playerFieldKnownTitles[mask >> 6] & (1ull << (mask & 63)))) {
+         lua_pushnumber(L, 1.0);
+     } else {

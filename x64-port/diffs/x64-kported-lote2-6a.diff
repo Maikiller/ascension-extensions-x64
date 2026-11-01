@@ -1,0 +1,17 @@
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+index faf76b4..39fca59 100644
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -32,6 +32,12 @@ namespace
+         "AscWildcardSets", "AscObjectAddon", "AscCallboard", "AscBuildDraft", "AscSpecs", "AscHighRisk",
+         "AscAutoQuest", "AscTooltipInsertFix", "AscBugTracker", "AscSpellCharges", "AscConfig", "AscLogger",
+         "AscQuestSpellHide", "AscPlayerPoll", "AscMythicPlus",
++        // lote 2 (30/10, projects-6a): triagem out/x64-triagem-modulos.md sem pendencia; dependem das listas do
++        // AscRuntime (x64-runtime-hooks-6a.diff). AscAttachInline fica fora: seus patches sao de codigo e ja
++        // entram como WriteCodeX64 no operands-x64.diff.
++        "AscGameObjectUse", "AscSkillCardSlots", "AscSkillCardCollection", "AscRecoveryService", "AscCustomStore",
++        "AscGMTicket", "AscDbcReaders", "AscGroupFinder", "AscMysticEnchantPreset", "AscTrialCreator",
++        "AscTemplates", "AscGlobalsH", "AscSpellActivationOverlay", "AscAlternatePower", "AscAuraAmounts",
+         nullptr };
+ }
+ 

@@ -1,0 +1,15 @@
+# Dono de cada modulo para a triagem da bateria (tools/bateria.py). "AscX AscY: sessao".
+# Quadro so no exe (sem a DLL na pilha) -> *cliente. Modulo nao listado -> * (a mestre re-tria).
+*cliente: operario699-c1
+*: operario-mestre
+
+AscTooltipScaling AscFontRender AscAttachFixes AscDiscord AscCrashContext AscCrashReport: operario699-c2
+AscClientDbcPatch AscClientDbc AscNativeLogon: operario699-c2
+
+AscPOI AscAura137 AscRealmData AscMisc AscClientOptions AscAttachLate AscUnitSelect: operario-mestre
+AscInitHooks AscAttachLua AscX64 AscRuntime AscBateria AscZoneLight: operario-mestre
+
+AscMemoryBridge AscHdDbc AscCamera AscNamePlates AscBridgeStore AscItemUse AscSceneTransform AscModelNames: operario
+AscItemStats AscItemCollections AscModelMethods AscMovementForce AscProfiler AscSpellMods AscSpellShadow: operario
+AscSpellTokens AscSmallHooks AscAttachPatches AscAnimationCount AscAttachInline AscLoadingScreen AscGossipQuest: operario
+AscGeosets AscSpellVisuals: operario

@@ -1,0 +1,157 @@
+diff --git a/src/Ascension/AscUnitSelect.cpp b/src/Ascension/AscUnitSelect.cpp
+index dab5d6f..737a636 100644
+--- a/src/Ascension/AscUnitSelect.cpp
++++ b/src/Ascension/AscUnitSelect.cpp
+@@ -71,7 +71,13 @@ namespace
+     int __cdecl Hook7460C0()   // FUN_102da2b0
+     {
+         const int r = g_7460C0();
++#if ASC_X64
++        // the CStatus objects (vtable 0x9F4250) have no x64 address; the global status 0xAF5718 instead
++        void* first = ASC_PTR(0xAF5718);
++        void* second = first;
++#else
+         uint32_t first[2] = {0x9F4250, 8}, second[2] = {0x9F4250, 8};
++#endif
+         g_unitSelect = Load("Textures\\UnitSelectTexture.blp", first);
+         g_tracking = Load("Textures\\TrackingTexture.blp", second);
+         g_questSelect = Load("Textures\\UnitSelectTexture-Quest.blp", second);
+@@ -91,18 +97,43 @@ namespace
+             VirtualProtect(reinterpret_cast<void*>(at), 4, old, &old);
+     }
+ 
++    // The circle texture SetCircleRenderStates (0x744EB0) binds. x86: its operand at 0x744EB1 is pointed at
++    // `texture` and then back at the stock 0xCA12C4. x64: the operand is rip-relative and cannot reach the DLL,
++    // so the value at 0xCA12C4 itself is swapped for the draw and put back.
++#if ASC_X64
++    void* g_stockTexture = nullptr;
++#endif
++    void UseTexture(void* const* texture)
++    {
++#if ASC_X64
++        void** slot = static_cast<void**>(ASC_PTR(0xCA12C4));
++        g_stockTexture = *slot;
++        *slot = *texture;
++#else
++        WriteCode32(0x744EB1, reinterpret_cast<uint32_t>(texture));
++#endif
++    }
++    void StockTexture()
++    {
++#if ASC_X64
++        *static_cast<void**>(ASC_PTR(0xCA12C4)) = g_stockTexture;
++#else
++        StockTexture();
++#endif
++    }
++
+     int __fastcall Hook72B7E0(void* self ASC_EDX_P(void* edx))   // FUN_102da6c0
+     {
+         if (const CVar* time = CVar::Lookup("AutoInteractCursorTime"))   // 0x10BE3874
+         {
+-            const uint32_t ms = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(time) + 0x30);
++            const uint32_t ms = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(time) + ASC_OFF(0x30, 0x54));
+             const uint32_t now = reinterpret_cast<uint32_t(__cdecl*)()>(ASC_PTR(0x86AE20))();
+             if (ms && ms < now - g_lastInteract)
+                 return 0;
+         }
+-        WriteCode32(0x744EB1, reinterpret_cast<uint32_t>(&g_tracking));
++        UseTexture(&g_tracking);
+         const int r = reinterpret_cast<int(__fastcall*)(void* ASC_EDX_P(void*))>(ASC_PTR(0x7275C0))(self ASC_EDX_A(edx));   // the thunk's target
+-        WriteCode32(0x744EB1, 0xCA12C4);
++        StockTexture();
+         return r;
+     }
+ 
+@@ -125,11 +156,17 @@ namespace
+     Fn727400_t g_727400 = nullptr;
+     char __fastcall Hook727400(void* self ASC_EDX_P(void* edx), uint32_t a, uintptr_t b, uintptr_t c, float d)   // FUN_102da340
+     {
++#if ASC_X64
++        const uintptr_t exe = reinterpret_cast<uintptr_t>(GetModuleHandleA(nullptr));
++        const uintptr_t exeEnd = exe + reinterpret_cast<const IMAGE_NT_HEADERS*>(exe + reinterpret_cast<const IMAGE_DOS_HEADER*>(exe)->e_lfanew)->OptionalHeader.SizeOfImage;
++        if (reinterpret_cast<uintptr_t>(_ReturnAddress()) >= exeEnd)   // past the exe image, as > 0xDFCBFF on x86
++#else
+         if (reinterpret_cast<uint32_t>(_ReturnAddress()) > 0xDFCBFF)
++#endif
+             SendBotReport();
+         const char r = g_727400(self ASC_EDX_A(edx), a, b, c, d);
+         const CVar* speed = CVar::Lookup("AutoInteractTurnSpeed");   // 0x10BE3870
+-        *reinterpret_cast<uint32_t*>(ASC_PTR(0xCA11DC)) = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(speed) + 0x2C);
++        *reinterpret_cast<uint32_t*>(ASC_PTR(0xCA11DC)) = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(speed) + ASC_OFF(0x2C, 0x50));
+         g_lastInteract = reinterpret_cast<uint32_t(__cdecl*)()>(ASC_PTR(0x86AE20))();
+         return r;
+     }
+@@ -143,6 +180,19 @@ namespace
+     const float kTen = 10.0f;   // 0x10BCBF80
+     void PatchRadius(bool on)   // FUN_102dad10
+     {
++#if ASC_X64
++        // CM2SceneRender::DrawBatchProj: x86 widens the projected box in z by one constant (fld [0xA4040C], 2.0);
++        // x64 does `addss [rip -> -2.0]` then `addss [rip -> 2.0]` (0x820809 -> rva 0x149351, 8 bytes each).
++        // Their disp32s are repointed at -10.0 (rva 0x7EF6E0) / 10.0 (rva 0x775A1C) in the exe's .rdata.
++        (void)kTen;
++        static const int32_t kStock[2] = {0x63D2C3, 0x62B6CF};
++        static const int32_t kTenDisp[2] = {0x7EF6E0 - 0x149359, 0x775A1C - 0x149361};
++        const int32_t* now = on ? kTenDisp : kStock;
++        const int32_t* was = on ? kStock : kTenDisp;
++        AscX64::WriteCodeX64(0x820809, &now[0], 4, &was[0], 4);
++        AscX64::WriteCodeX64(0x820809, &now[1], 4, &was[1], 0xC);
++        return;
++#endif
+         WriteCode32(0x82080B, on ? reinterpret_cast<uint32_t>(&kTen) : 0xA4040C);
+     }
+ 
+@@ -263,11 +313,11 @@ namespace
+         float p[3], box[6];
+         Position(object, p);
+         Box(p, r, box);
+-        WriteCode32(0x744EB1, reinterpret_cast<uint32_t>(&g_unitSelect));
++        UseTexture(&g_unitSelect);
+         BeginDraw();
+         Draw(object, box, &colour, matrix);
+         EndDraw();
+-        WriteCode32(0x744EB1, 0xCA12C4);
++        StockTexture();
+     }
+ 
+     // FUN_102db140: a unit casting a cone (an effect whose implicit target A is 24 / 54 / 104 / 59) -- the
+@@ -327,9 +377,9 @@ namespace
+         box[1] = dy + box[1];
+         box[2] = box[2] + 0.0f;
+         BeginDraw();
+-        WriteCode32(0x744EB1, reinterpret_cast<uint32_t>(&texture));
++        UseTexture(&texture);
+         Draw(unit, box, &colour, matrix);
+-        WriteCode32(0x744EB1, 0xCA12C4);
++        StockTexture();
+         EndDraw();
+     }
+ 
+@@ -359,11 +409,11 @@ namespace
+         float p[3], box[6];
+         Position(unit, p);
+         Box(p, r, box);
+-        WriteCode32(0x744EB1, reinterpret_cast<uint32_t>(&g_questSelect));
++        UseTexture(&g_questSelect);
+         BeginDraw();
+         Draw(unit, box, &colour, matrix);
+         EndDraw();
+-        WriteCode32(0x744EB1, 0xCA12C4);
++        StockTexture();
+     }
+ 
+     int __cdecl EnumDynamic(uint32_t lo, uint32_t hi, void*)   // FUN_102da220
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -61,6 +61,9 @@
+         // medicao 30/10 (projects-2c): nativas que voltaram nil + pacotes 0x66D/0x76F. GlobalsB (limites de DBC via
+         // AscClientDbc), Misc (m_nameDesc 8 bytes em +0x130, CVar m_key +0x28); D/E/F/Json/GameMode conferidos.
+         "AscGlobalsB", "AscGlobalsD", "AscGlobalsE", "AscGlobalsF", "AscJson", "AscMisc", "AscGameMode",
++        // lote 3 (projects-2c): textura do circulo por troca do valor em 0xCA12C4 (operando rip nao alcanca o
++        // DLL); raio 10.0 pelos dois disp32 do DrawBatchProj (extra-addr 0x820809); CVar int/float em ASC_OFF.
++        "AscUnitSelect",
+         nullptr };
+ }
+ 

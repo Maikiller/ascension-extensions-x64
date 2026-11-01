@@ -1,0 +1,114 @@
+diff --git a/src/Ascension/AscCAMgr.cpp b/src/Ascension/AscCAMgr.cpp
+index 46d3e61..902f93b 100644
+--- a/src/Ascension/AscCAMgr.cpp
++++ b/src/Ascension/AscCAMgr.cpp
+@@ -1608,7 +1608,11 @@ namespace
+         if (next <= _time64(nullptr))
+         {
+             index.clear();
++#if ASC_X64
++            const uint32_t maxSpell = AscClientDbc::MaxId(0xAD49D0);   // Spell.dbc
++#else
+             const uint32_t maxSpell = *reinterpret_cast<const uint32_t*>(ASC_PTR(0xAD49DC));
++#endif
+             const Build* active = ActiveBuild();
+             ForEachRow([&](Row r) {
+                 if (!Visible(r) || !ClassAllowed(r) || !active->Has(RowU32(r, 0)))
+@@ -1692,7 +1696,11 @@ namespace
+                 g_bySpell[spell].push_back(r);
+         if (Visible(r) && ClassAllowed(r))
+         {
++#if ASC_X64
++            const uint32_t maxSpell = AscClientDbc::MaxId(0xAD49D0);   // Spell.dbc
++#else
+             const uint32_t maxSpell = *reinterpret_cast<const uint32_t*>(ASC_PTR(0xAD49DC));   // FUN_100b1020
++#endif
+             for (uint32_t off = 0x14; off < 0x38; off += 4)
+             {
+                 const uint32_t spell = RowU32(r, off);
+diff --git a/src/Ascension/AscMysticEnchant.cpp b/src/Ascension/AscMysticEnchant.cpp
+index 449969f..74c4b9e 100644
+--- a/src/Ascension/AscMysticEnchant.cpp
++++ b/src/Ascension/AscMysticEnchant.cpp
+@@ -1308,7 +1308,7 @@ namespace
+             e.push_back(2);
+         else
+         {
+-            if (player && Coinage(player) < *reinterpret_cast<const uint32_t*>(rec + 0x20))
++            if (player && Coinage(player) < *reinterpret_cast<const uint32_t*>(rec + ASC_OFF(0x20, 0x24)))
+                 e.push_back(3);
+             if (FreeBagSlots() == 0)
+                 e.push_back(4);
+@@ -2440,7 +2440,7 @@ namespace
+     int GetMysticScrollCost(lua_State* L)   // 0x102ED760
+     {
+         if (const uint8_t* rec = ItemCacheRecord(kMysticScroll))
+-            PushInt(L, *reinterpret_cast<const int32_t*>(rec + 0x20));
++            PushInt(L, *reinterpret_cast<const int32_t*>(rec + ASC_OFF(0x20, 0x24)));   // ItemStats_C m_buyPrice
+         else
+             AscLua::lua_pushnil(L);
+         return 1;
+diff --git a/src/Ascension/AscSpellApi.cpp b/src/Ascension/AscSpellApi.cpp
+index e230eed..2dc9fed 100644
+--- a/src/Ascension/AscSpellApi.cpp
++++ b/src/Ascension/AscSpellApi.cpp
+@@ -4,6 +4,7 @@
+ // targets, [0x5F+i] aura, [0x6E+i] misc value, [0x74+i] trigger spell, [0x85], [0x90] family,
+ // [0x91] family flags.
+ // HasRuneUI lives with the CharacterAdvancement manager (AscCAMgr.cpp).
++#include <Ascension/AscClientDbc.hpp>
+ #include <Ascension/AscBindings.hpp>
+ #include <Ascension/AscCAMgr.hpp>
+ #include <Ascension/AscDbc.hpp>
+@@ -306,8 +307,12 @@ namespace
+     {
+         g_slaBuilt = true;
+         g_slaBySpell.clear();
++#if ASC_X64
++        const uint32_t minId = AscClientDbc::MinId(kSkillLineAbilityDbc), maxId = AscClientDbc::MaxId(kSkillLineAbilityDbc);
++#else
+         const uint32_t minId = *reinterpret_cast<const uint32_t*>(kSkillLineAbilityDbc + 0x10);
+         const uint32_t maxId = *reinterpret_cast<const uint32_t*>(kSkillLineAbilityDbc + 0x0C);
++#endif
+         for (uint32_t id = minId; id < maxId + 1; ++id)
+             if (const uint8_t* row = ClientDbcRow(kSkillLineAbilityDbc, id))
+                 g_slaBySpell[AscDbc::Table::U32(row, 8)] = row;
+@@ -391,8 +396,12 @@ void AscSpellApi_SkillLineAbilityUpdate(uint32_t spell)
+     }
+     if (!g_slaBuilt)
+         BuildSkillLineAbility();
++#if ASC_X64
++    const uint32_t minId = AscClientDbc::MinId(kSkillLineAbilityDbc), maxId = AscClientDbc::MaxId(kSkillLineAbilityDbc);
++#else
+     const uint32_t minId = *reinterpret_cast<const uint32_t*>(kSkillLineAbilityDbc + 0x10);
+     const uint32_t maxId = *reinterpret_cast<const uint32_t*>(kSkillLineAbilityDbc + 0x0C);
++#endif
+     for (uint32_t id = minId; id < maxId + 1; ++id)
+         if (const uint8_t* row = ClientDbcRow(kSkillLineAbilityDbc, id))
+             if (AscDbc::Table::U32(row, 8) == spell)
+diff --git a/src/Ascension/AscTutorial.cpp b/src/Ascension/AscTutorial.cpp
+index d9639a6..83c4dda 100644
+--- a/src/Ascension/AscTutorial.cpp
++++ b/src/Ascension/AscTutorial.cpp
+@@ -834,7 +834,7 @@ namespace
+     int AnyUnclaimedRewards(lua_State* L)   // FUN_10a19680
+     {
+         const uint8_t* cvar = reinterpret_cast<const uint8_t*(__cdecl*)(const char*)>(ASC_PTR(0x767440))("showTutorials");
+-        if (!cvar || *reinterpret_cast<const int32_t*>(cvar + 0x30) != 0)
++        if (!cvar || *reinterpret_cast<const int32_t*>(cvar + ASC_OFF(0x30, 0x54)) != 0)
+         {
+             Table& c = Categories();
+             for (uint32_t cat = c.MinId(); c.Loaded() && cat <= c.MaxId(); ++cat)
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -51,6 +51,9 @@
+         // g3: SpellText (SpellParserParseText com o SpellRec nativo), SuperTrack (LeaderBoardParams x64 +
+         // Script_SetPoint x64). Os CVars de mundo deles dependem do detour 0x51D9B0 do AscClientOptions.
+         "AscSpellText", "AscSuperTrack",
++        // lote 5 (30/10, projects-2c) g1 -- chamados ao entrar no mundo. SpellApi/CAMgr: limites de DBC via
++        // AscClientDbc; MysticEnchant: ItemStats_C m_buyPrice +0x24; Tutorial: CVar int +0x54.
++        "AscSpellApi", "AscTutorial", "AscMysticEnchant", "AscCAMgr",
+         nullptr };
+ }
+ 

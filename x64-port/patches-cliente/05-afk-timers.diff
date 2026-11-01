@@ -1,0 +1,46 @@
+diff --git a/WoW/Source/Ui/GameUI.cpp b/WoW/Source/Ui/GameUI.cpp
+index a0a8128..2cd6287 100644
+--- a/WoW/Source/Ui/GameUI.cpp
++++ b/WoW/Source/Ui/GameUI.cpp
+@@ -180,6 +180,15 @@ const int32_t AUTO_SIT_IDLE_TIME = 300000;
+ const int32_t AUTO_LOGOUT_IDLE_TIME = 1800000;
+ }
+ 
++#if defined(_WIN64)
++// CoA: SetAFKTimer / SetAFKLogoutTimer do Extensions.dll (x86: imm de 0x52B259 / 0x52B266 = -valor, e o jl 0x52B25F /
++// jne 0x52B27A vira jmp quando o valor e 0). Em ms; 0 = desligado. O ext grava o valor positivo.
++// STATIC: 0x0052B259
++int32_t g_coaAutoSitIdleTime = AUTO_SIT_IDLE_TIME;
++// STATIC: 0x0052B266
++int32_t g_coaAutoLogoutIdleTime = AUTO_LOGOUT_IDLE_TIME;
++#endif
++
+ static const float MAX_CAMERA_SHIFT_SQUARED = 900.0f;
+ 
+ static const float TARGET_NEAREST_FRONT_MAX_DISTANCE_SQUARED = 1681.0f;
+@@ -2087,8 +2096,13 @@ int32_t CGGameUI::Idle(const void* data, void* param) {
+ 
+     int32_t idleTime = OsGetAsyncTimeMs() - CSimpleTop::s_eventTime;
+ 
++#if defined(_WIN64)
++    if (g_coaAutoSitIdleTime && idleTime - g_coaAutoSitIdleTime >= 0) {
++        if (idleTime - g_coaAutoLogoutIdleTime < 0) {
++#else
+     if (idleTime - AUTO_SIT_IDLE_TIME >= 0) {
+         if (idleTime - AUTO_LOGOUT_IDLE_TIME < 0) {
++#endif
+             if (player) {
+                 if (!player->m_unit->m_unitFieldBytes1[0] && !(player->m_unit->m_unitFieldFlags & 0x80000) && !player->IsMounted() && !player->IsAutoTracking()) {
+                     player->ChangeStandState(UNIT_SITTING);
+@@ -2098,7 +2112,11 @@ int32_t CGGameUI::Idle(const void* data, void* param) {
+                     player->SetAFK(nullptr);
+                 }
+             }
++#if defined(_WIN64)
++        } else if (g_coaAutoLogoutIdleTime && !ClientServices::Connection()->CharacterLoggingOut()) {
++#else
+         } else if (!ClientServices::Connection()->CharacterLoggingOut()) {
++#endif
+             CGChat::AddChatMessage(FrameScript_GetText("IDLE_MESSAGE", -1, GENDER_NOT_APPLICABLE), 0, 0, 0, 0, 0, nullptr, WOWGUID(), 0, WOWGUID(), 0, 0, 0);
+             CGLCD::IdleDisconnectWarning();
+             ClientServices::Connection()->CharacterLogout(false, false);

@@ -1,0 +1,133 @@
+diff --git a/src/Ascension/AscAddonTaint.cpp b/src/Ascension/AscAddonTaint.cpp
+index f3bafa7..0ba63fa 100644
+--- a/src/Ascension/AscAddonTaint.cpp
++++ b/src/Ascension/AscAddonTaint.cpp
+@@ -94,7 +94,7 @@ namespace
+         }
+     }
+ #else
+-    int Original510430(uint32_t) { AscX64::Unported("Original510430"); return {}; }
++    int Original510430(uintptr_t) { AscX64::Unported("Original510430"); return {}; }
+ #endif
+ #if !ASC_X64
+     __declspec(naked) int __cdecl Original510450(uint32_t)
+@@ -110,7 +110,7 @@ namespace
+         }
+     }
+ #else
+-    int Original510450(uint32_t) { AscX64::Unported("Original510450"); return {}; }
++    int Original510450(uintptr_t) { AscX64::Unported("Original510450"); return {}; }
+ #endif
+ #if !ASC_X64
+     __declspec(naked) int __cdecl Original510A00(uint32_t)
+@@ -125,7 +125,7 @@ namespace
+         }
+     }
+ #else
+-    int Original510A00(uint32_t) { AscX64::Unported("Original510A00"); return {}; }
++    int Original510A00(uintptr_t) { AscX64::Unported("Original510A00"); return {}; }
+ #endif
+ 
+     int __cdecl Hook5191C0(uint32_t action)   // FUN_103115b0
+@@ -149,9 +149,9 @@ namespace
+     }
+ 
+     int __cdecl Hook49F210(uint32_t a) { return Cleared(g_49F210, a); }        // FUN_10311ac0
+-    int __cdecl Hook510430(uint32_t a) { return Cleared(&Original510430, a); } // FUN_10313520
+-    int __cdecl Hook510450(uint32_t a) { return Cleared(&Original510450, a); } // FUN_10313620
+-    int __cdecl Hook510A00(uint32_t a) { return Cleared(&Original510A00, a); } // FUN_10313030
++    int __cdecl Hook510430(uintptr_t a) { return Cleared(&Original510430, a); } // FUN_10313520
++    int __cdecl Hook510450(uintptr_t a) { return Cleared(&Original510450, a); } // FUN_10313620
++    int __cdecl Hook510A00(uintptr_t a) { return Cleared(&Original510A00, a); } // FUN_10313030
+     int __cdecl Hook51A7A0(uint32_t a) { return Cleared(g_51A7A0, a); }        // FUN_10313950
+     int __cdecl Hook51AC90() { return Cleared(g_51AC90); }                     // FUN_10312f00
+     int __cdecl Hook51FB80(uint32_t a, uint32_t b, uint32_t c) { return Cleared(g_51FB80, a, b, c); }   // FUN_103117b0
+diff --git a/src/Ascension/AscAttachFixes.cpp b/src/Ascension/AscAttachFixes.cpp
+index 84977f5..b994398 100644
+--- a/src/Ascension/AscAttachFixes.cpp
++++ b/src/Ascension/AscAttachFixes.cpp
+@@ -128,7 +128,11 @@ namespace
+ 
+     // ---- 0x4D5F70 / 0x6B0F90: replaced outright ------------------------------------------------------
+     // sub_10a43730 (__stdcall(out), ret 4): *out = FUN_102bd200(0xFF, 0xFF, 0xFF, 0) = 0xFFFFFF00.
++#if ASC_X64
++    void FixedColour(void* /*self*/, uint32_t* out) { *out = 0xFFFFFF00; }   // x64: this em rcx, out em rdx
++#else
+     void __stdcall FixedColour(uint32_t* out) { *out = 0xFFFFFF00; }
++#endif
+     // sub_10a4aae0
+     uint32_t __cdecl Fixed57() { return 0x57; }
+ 
+diff --git a/src/Ascension/AscAttachLate.cpp b/src/Ascension/AscAttachLate.cpp
+index 9c75e73..89477fa 100644
+--- a/src/Ascension/AscAttachLate.cpp
++++ b/src/Ascension/AscAttachLate.cpp
+@@ -64,9 +64,9 @@ namespace
+         }
+     }
+ #else
+-    int Original52ED60(uint32_t) { AscX64::Unported("Original52ED60"); return {}; }
++    int Original52ED60(uintptr_t) { AscX64::Unported("Original52ED60"); return {}; }
+ #endif
+-    int __cdecl Hook52ED60(uint32_t a)   // 0x10A6EB60
++    int __cdecl Hook52ED60(uintptr_t a)   // 0x10A6EB60
+     {
+         if (!*reinterpret_cast<const uint32_t*>(ASC_PTR(0xBD19AC)) || !*reinterpret_cast<const uint32_t*>(ASC_PTR(0xBD19B0)) ||
+             !*reinterpret_cast<const uint32_t*>(ASC_PTR(0xBD19B4)))
+diff --git a/src/Ascension/AscCamera.cpp b/src/Ascension/AscCamera.cpp
+index 4a1efef..f2cced6 100644
+--- a/src/Ascension/AscCamera.cpp
++++ b/src/Ascension/AscCamera.cpp
+@@ -154,7 +154,7 @@ namespace
+ 
+     int __cdecl RecordHit(uint32_t, uint32_t, uint8_t* model)   // FUN_1019c2f0, replaces 0x7A25F0
+     {
+-        const float alpha = *reinterpret_cast<const float*>(model + 0x17C);
++        const float alpha = *reinterpret_cast<const float*>(model + ASC_OFF(0x17C, 0x20C));
+         g_hits.emplace_back(model, alpha);
+         int bits;
+         memcpy(&bits, &alpha, 4);
+diff --git a/src/Ascension/AscNativeLogon.cpp b/src/Ascension/AscNativeLogon.cpp
+index 314d969..49ba4dd 100644
+--- a/src/Ascension/AscNativeLogon.cpp
++++ b/src/Ascension/AscNativeLogon.cpp
+@@ -817,7 +817,11 @@ namespace
+ 
+     // 0x9A88C0 - server proof check. The exe's reply handler reads the proof field and calls this
+     // with (field, size); nonzero return = failure (the handler then reports error 0xB).
++#if ASC_X64
++    int HookProofCheck(void* /*self*/, const uint8_t* field, unsigned int size)   // x64: this em rcx
++#else
+     int __stdcall HookProofCheck(const uint8_t* field, unsigned int size)
++#endif
+     {
+         if (size != 32)
+         {
+diff --git a/src/Ascension/AscTooltipScaling.cpp b/src/Ascension/AscTooltipScaling.cpp
+index 4c11636..d6bd12a 100644
+--- a/src/Ascension/AscTooltipScaling.cpp
++++ b/src/Ascension/AscTooltipScaling.cpp
+@@ -268,11 +268,11 @@ namespace
+ 
+     // ---- 0x6277F0: the item builder (__thiscall, 16 arguments, ret 0x40) ----------------------------------
+     typedef int(__fastcall* Fn6277F0_t)(void* ASC_EDX_P(void*), uint32_t, const uint64_t*, const uint64_t*, uint32_t, uint32_t, uint32_t,
+-                                        uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
++                                        uint32_t, ASC_GUID2_T, uint32_t, uintptr_t, uint32_t, uintptr_t, uint32_t, uint32_t, uint32_t);
+     Fn6277F0_t g_6277F0 = nullptr;
+     int __fastcall Detour6277F0(void* tip ASC_EDX_P(void* edx), uint32_t item, const uint64_t* linkGuid, const uint64_t* objectGuid,
+-                                uint32_t a4, uint32_t a5, uint32_t a6, uint32_t a7, uint32_t a8, uint32_t a9, uint32_t a10,
+-                                uint32_t a11, uint32_t a12, uint32_t a13, uint32_t a14, uint32_t a15, uint32_t a16)
++                                uint32_t a4, uint32_t a5, uint32_t a6, uint32_t a7, ASC_GUID2_P(a8, a9), uint32_t a10,
++                                uintptr_t a11, uint32_t a12, uintptr_t a13, uint32_t a14, uint32_t a15, uint32_t a16)
+     {
+         if (g_guildBankLevel != 0)
+             a15 = 0;
+@@ -308,7 +308,7 @@ namespace
+             if ((cap == 0x50 && required == 0x46) || (cap == 0x46 && required == 0x3C))
+                 Patch62B98F(false);
+         }
+-        const int result = g_6277F0(tip ASC_EDX_A(edx), item, linkGuid, objectGuid, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16);
++        const int result = g_6277F0(tip ASC_EDX_A(edx), item, linkGuid, objectGuid, a4, a5, a6, a7, ASC_GUID2_A(a8, a9), a10, a11, a12, a13, a14, a15, a16);
+         g_item = 0;
+         g_linkGuid = 0;
+         g_tooltipGuid = 0;

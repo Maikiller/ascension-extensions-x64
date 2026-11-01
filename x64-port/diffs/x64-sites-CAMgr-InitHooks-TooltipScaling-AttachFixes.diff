@@ -1,0 +1,219 @@
+diff --git a/src/Ascension/AscAttachFixes.cpp b/src/Ascension/AscAttachFixes.cpp
+index ce48371..e16357f 100644
+--- a/src/Ascension/AscAttachFixes.cpp
++++ b/src/Ascension/AscAttachFixes.cpp
+@@ -293,6 +293,17 @@ namespace
+             if (*reinterpret_cast<const uint32_t*>(fields + 0x24) == 0x16C7A)
+                 g_fadeFlag = 0;
+         }
++#if ASC_X64
++        // CGObject_C::PostInit+0x1A: call [rax+0x1C8] (6 bytes). Um getter da DLL nao cabe num rel32, entao o
++        // site vira mov eax, g_fadeFlag e e regravado so quando o valor muda (o Init deixa mov eax, 1).
++        static uint8_t s_written = 1;
++        if (s_written != g_fadeFlag)
++        {
++            const uint8_t want[6] = {0xB8, g_fadeFlag, 0x00, 0x00, 0x00, 0x90}, have[6] = {0xB8, s_written, 0x00, 0x00, 0x00, 0x90};
++            AscX64::WriteCodeX64(0x744A55, want, 6, have);
++            s_written = g_fadeFlag;
++        }
++#endif
+         return g_744A50(ecx ASC_EDX_A(edx), a, b, c);
+     }
+ 
+@@ -1007,6 +1018,17 @@ namespace
+     Fn6DC3F0_t g_6DC3F0 = nullptr;
+     int __fastcall Detour6DC3F0(void* ecx ASC_EDX_P(void* edx), uintptr_t a, uintptr_t b)
+     {
++#if ASC_X64
++        // Script_GetMerchantItemInfo: retorno do call CanUseItem. O teste de pilha e so o jg (0F 8F F9 00 00 00)
++        // em CGPlayer_C::CanUseItem+0x52 -- o mov/cmp antes dele ficam (o rdx segue em uso).
++        if (_ReturnAddress() == AscX64::Ptr(0x584FBE))
++            return g_6DC3F0(ecx ASC_EDX_A(edx), a, b);
++        static const uint8_t kJgX64[6] = {0x0F, 0x8F, 0xF9, 0x00, 0x00, 0x00}, kNop6[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
++        AscX64::WriteCodeX64(0x6DC41D, kNop6, 6, kJgX64);
++        const int r64 = g_6DC3F0(ecx ASC_EDX_A(edx), a, b);
++        AscX64::WriteCodeX64(0x6DC41D, kJgX64, 6, kNop6);
++        return r64;
++#endif
+         if (reinterpret_cast<uintptr_t>(_ReturnAddress()) == 0x584FBE)
+             return g_6DC3F0(ecx ASC_EDX_A(edx), a, b);
+         static const uint8_t kNops[15] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+@@ -1023,6 +1045,22 @@ namespace
+     int __cdecl Detour805D70(const uint32_t* spell, uintptr_t b)
+     {
+         const uint8_t* attr = AscCA::SpellCustomAttrRow(*spell);
++#if ASC_X64
++        // Spell_C_StartSpellCooldown+0xD8: jbe 76 11; +0x87: jne 75 62 -> jmp EB 1E (cai no mesmo bloco do x86).
++        static const uint8_t kJbeX64[1] = {0x76}, kJmpX64[1] = {0xEB}, kJneX64[2] = {0x75, 0x62}, kJmp1EX64[2] = {0xEB, 0x1E};
++        const bool forceA = attr && (*reinterpret_cast<const uint32_t*>(attr + 0x14) & 0x800000);
++        const bool forceB = attr && (*reinterpret_cast<const uint32_t*>(attr + 0x18) & 0x10);
++        if (forceA)
++            AscX64::WriteCodeX64(0x805E2D, kJmpX64, 1, kJbeX64);
++        if (forceB)
++            AscX64::WriteCodeX64(0x805DDD, kJmp1EX64, 2, kJneX64);
++        const int r64 = g_805D70(spell, b);
++        if (forceA)
++            AscX64::WriteCodeX64(0x805E2D, kJbeX64, 1, kJmpX64);
++        if (forceB)
++            AscX64::WriteCodeX64(0x805DDD, kJneX64, 2, kJmp1EX64);
++        return r64;
++#endif
+         if (attr && (*reinterpret_cast<const uint32_t*>(attr + 0x14) & 0x800000))   // FUN_10324a10
+         {
+             static const uint8_t kJmp = 0xEB;
+@@ -1067,10 +1105,15 @@ namespace
+         g_6F9260 = reinterpret_cast<Fn6F9260_t>(AscRuntime::Detour(0x6F9260, 5, reinterpret_cast<void*>(&Detour6F9260)));
+         g_7F3B60 = reinterpret_cast<Fn7F3B60_t>(AscRuntime::Detour(0x7F3B60, 5, reinterpret_cast<void*>(&Detour7F3B60)));
+         g_806030 = reinterpret_cast<Fn806030_t>(AscRuntime::Detour(0x806030, 9, reinterpret_cast<void*>(&Detour806030)));
++#if ASC_X64
++        static const uint8_t kVcallX64[6] = {0xFF, 0x90, 0xC8, 0x01, 0x00, 0x00}, kMovEax1[6] = {0xB8, 0x01, 0x00, 0x00, 0x00, 0x90};
++        AscX64::WriteCodeX64(0x744A55, kMovEax1, 6, kVcallX64);   // g_fadeFlag inicia em 1 (ver Detour744A50)
++#else
+         uint8_t movEdx[6] = {0xC7, 0xC2};
+         const uint32_t getter = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&FadeFlag));
+         memcpy(movEdx + 2, &getter, 4);
+         WriteCode(0x744A55, movEdx, sizeof(movEdx));
++#endif
+         g_744A50 = reinterpret_cast<Fn744A50_t>(AscRuntime::Detour(0x744A50, 5, reinterpret_cast<void*>(&Detour744A50)));
+         g_81F970 = reinterpret_cast<Fn81F970_t>(AscRuntime::Detour(0x81F970, 5, reinterpret_cast<void*>(&Detour81F970)));
+         sDC.AddPacketHandler(0x65C, CNetClientCustomPacket((void*)&OnMarkerModel, nullptr));
+diff --git a/src/Ascension/AscCAMgr.cpp b/src/Ascension/AscCAMgr.cpp
+index 533fa17..46d3e61 100644
+--- a/src/Ascension/AscCAMgr.cpp
++++ b/src/Ascension/AscCAMgr.cpp
+@@ -324,6 +324,14 @@ namespace
+         static uint8_t saved[3][5];
+         static const uint32_t kSites[3] = {0x542679, 0x5427BE, 0x54284E};
+         static const uint8_t kNops[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
++#if ASC_X64
++        // CGSpellBook::AddKnownSpell+0x5CB/+0x69F/+0x71B: call DisplayError (rel32 do WowClient64).
++        static const uint8_t kCalls[3][5] = {{0xE8, 0x50, 0x28, 0xFE, 0xFF}, {0xE8, 0x7C, 0x27, 0xFE, 0xFF}, {0xE8, 0x00, 0x27, 0xFE, 0xFF}};
++        (void)saved;
++        if (on ? count++ == 0 : (count && --count == 0))
++            for (int i = 0; i < 3; ++i)
++                AscX64::WriteCodeX64(kSites[i], on ? kNops : kCalls[i], 5, on ? kCalls[i] : kNops);
++#else
+         if (on)
+         {
+             if (count++ == 0)
+@@ -336,6 +344,7 @@ namespace
+         else if (count && --count == 0)
+             for (int i = 0; i < 3; ++i)
+                 WriteCode(kSites[i], saved[i], 5);
++#endif
+     }
+ 
+     // FUN_1016d7c0
+@@ -440,6 +449,15 @@ namespace
+         static uint8_t saved[2][5];
+         static const uint32_t kSites[2] = {0x6E7346, 0x6E7356};
+         static const uint8_t kNops[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
++#if ASC_X64
++        // CGPlayer_C::DelKnownSpell+0x202: no x64 os dois ramos ("%s (%s)" e so o nome) dividem um unico call
++        // DisplayError -- o 0x6E7356 nao tem site proprio.
++        static const uint8_t kCall[5] = {0xE8, 0x29, 0xDB, 0x0A, 0x00};
++        (void)saved;
++        if (on ? count++ == 0 : (count && --count == 0))
++            AscX64::WriteCodeX64(kSites[0], on ? kNops : kCall, 5, on ? kCall : kNops);
++        return;
++#endif
+         if (on)
+         {
+             if (count++ == 0)
+diff --git a/src/Ascension/AscInitHooks.cpp b/src/Ascension/AscInitHooks.cpp
+index 111c592..f0b9b93 100644
+--- a/src/Ascension/AscInitHooks.cpp
++++ b/src/Ascension/AscInitHooks.cpp
+@@ -61,6 +61,17 @@ namespace
+         VirtualProtect(reinterpret_cast<void*>(at), 1, old, &old);
+         FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void*>(at), 1);
+     }
++#if ASC_X64
++    // x64: um byte de codigo do WowClient64 trocado entre dois valores (o expect e o outro).
++    void WriteCodeByteX64(uint32_t at, uint8_t value, uint8_t other) { AscX64::WriteCodeX64(at, &value, 1, &other); }
++    // CGUnit_C::ComputeMissileTrajectory+0x7B1/+0xAB3/+0xBCC: o 2o byte do imediato de
++    // mov [rsp+0x20],0x100111 (x86: push 0x100111). Os tres sempre recebem o mesmo valor.
++    void SetTrajectoryFlagByte(uint8_t value)
++    {
++        for (uint32_t at : {0x6FD59Eu, 0x6FD4C7u, 0x6FD335u})
++            WriteCodeByteX64(at, value, value ? 0 : 1);
++    }
++#endif
+ 
+     typedef int(__fastcall* This1_t)(void* ASC_EDX_P(void*), uintptr_t);
+     typedef int(__fastcall* This2_t)(void* ASC_EDX_P(void*), uintptr_t, uintptr_t);
+@@ -120,26 +131,40 @@ namespace
+         if (row && *reinterpret_cast<const uint32_t*>(obj + ASC_OFF(0x240, 0x250)) && *reinterpret_cast<const uint32_t*>(row + 0x1C) &&
+             *reinterpret_cast<const uint32_t*>(row + 0xC) && *reinterpret_cast<const uint32_t*>(row + 0x50))
+         {
++#if ASC_X64
++            SetTrajectoryFlagByte(0);
++#else
+             WriteByte(0x6FD59E, 0);
+             WriteByte(0x6FD4C7, 0);
+             WriteByte(0x6FD335, 0);
++#endif
+         }
+         return g_720BF0(self ASC_EDX_A(edx), a, b);
+     }
+ 
+     int __cdecl Detour6FDA20()   // FUN_10a45d80
+     {
++#if ASC_X64
++        SetTrajectoryFlagByte(1);
++#else
+         WriteByte(0x6FD59E, 1);
+         WriteByte(0x6FD4C7, 1);
+         WriteByte(0x6FD335, 1);
++#endif
+         return g_6FDA20();
+     }
+ 
+     int __fastcall Detour756240(void* self ASC_EDX_P(void* edx), uint32_t a, uint32_t b, uintptr_t c, uint32_t d)   // FUN_10a452f0
+     {
++#if ASC_X64
++        WriteCodeByteX64(0x756458, 0xEB, 0x74);   // CGUnit_C::HandleCombatAnimEvent+0x1A1: je 74 0F
++        const int r = g_756240(self ASC_EDX_A(edx), a, b, c, d);
++        WriteCodeByteX64(0x756458, 0x74, 0xEB);
++#else
+         WriteByte(0x756458, 0xEB);
+         const int r = g_756240(self ASC_EDX_A(edx), a, b, c, d);
+         WriteByte(0x756458, 0x74);
++#endif
+         return r;
+     }
+ 
+diff --git a/src/Ascension/AscTooltipScaling.cpp b/src/Ascension/AscTooltipScaling.cpp
+index d6bd12a..a5cdce5 100644
+--- a/src/Ascension/AscTooltipScaling.cpp
++++ b/src/Ascension/AscTooltipScaling.cpp
+@@ -130,12 +130,29 @@ namespace
+     void Patch62B98F(bool restore)   // FUN_1027da50
+     {
+         static const uint8_t kJmp[6] = {0xE9, 0xC1, 0x01, 0x00, 0x00, 0x00}, kJe[6] = {0x0F, 0x84, 0xC0, 0x01, 0x00, 0x00};
++#if ASC_X64
++        // CGTooltip::SetItem+0x6D1: if (stats->m_itemSet) -- je 74 5A <-> jmp EB 5A (mesmo alvo).
++        static const uint8_t kJeX64[2] = {0x74, 0x5A}, kJmpX64[2] = {0xEB, 0x5A};
++        (void)kJmp; (void)kJe;
++        AscX64::WriteCodeX64(0x62B98F, restore ? kJeX64 : kJmpX64, 2, restore ? kJmpX64 : kJeX64);
++#else
+         WriteCode(0x62B98F, restore ? kJe : kJmp, 6);
++#endif
+     }
+     void Patch627980(bool restore)   // FUN_1027d4f0
+     {
+         static const uint8_t kJmp[6] = {0xE9, 0x98, 0x00, 0x00, 0x00, 0x90}, kJne[6] = {0x0F, 0x85, 0x97, 0x00, 0x00, 0x00};
++#if ASC_X64
++        // CGTooltip::SetItem+0x20F: o x64 separou o "if (!wrapped)" em dois caminhos; no nao-embrulhado, o
++        // cmp [rdi+0x6C0],ecx / je vira xor r15d,r15d (randomPropertiesId = 0) + jmp para o fim do bloco
++        // (0x1403B03C0) -- o mesmo que o jmp forcado do x86.
++        static const uint8_t kStockX64[8] = {0x39, 0x8F, 0xC0, 0x06, 0x00, 0x00, 0x0F, 0x84};
++        static const uint8_t kJmpX64[8] = {0x45, 0x33, 0xFF, 0xE9, 0xB9, 0x00, 0x00, 0x00};
++        (void)kJmp; (void)kJne;
++        AscX64::WriteCodeX64(0x627980, restore ? kStockX64 : kJmpX64, 8, restore ? kJmpX64 : kStockX64);
++#else
+         WriteCode(0x627980, restore ? kJne : kJmp, 6);
++#endif
+     }
+     void Patch631760(bool restore)   // FUN_1027cf90
+     {

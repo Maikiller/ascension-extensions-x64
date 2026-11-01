@@ -1,0 +1,82 @@
+diff --git a/WoW/Source/Ui/GameUI_Scripts.cpp b/WoW/Source/Ui/GameUI_Scripts.cpp
+index dc4e834..39fc289 100644
+--- a/WoW/Source/Ui/GameUI_Scripts.cpp
++++ b/WoW/Source/Ui/GameUI_Scripts.cpp
+@@ -3147,11 +3147,19 @@ static int32_t Script_Logout(lua_State* L) {
+     return 0;
+ }
+ 
++#if defined(_WIN64)
++extern char g_coaGameBuildString[8];   // CoA: RealmConnection.cpp
++#endif
++
+ // VERIFY: e8e90aa3 manual
+ // OFFSET: 0x0050F890
+ static int32_t Script_GetBuildInfo(lua_State* L) {
+     lua_pushstring(L, GAME_VERSION);
++#if defined(_WIN64)
++    lua_pushstring(L, g_coaGameBuildString);   // CoA: texto do build (Extensions.dll, 0x9F5200)
++#else
+     lua_pushstring(L, GAME_BUILD_STRING);
++#endif
+     lua_pushstring(L, GAME_BUILD_DATE);
+     lua_pushnumber(L, GetCodeInterfaceVersion());
+     return 4;
+diff --git a/WoW/Source/WowServices/GruntLogin.cpp b/WoW/Source/WowServices/GruntLogin.cpp
+index d7633c2..dd014ed 100644
+--- a/WoW/Source/WowServices/GruntLogin.cpp
++++ b/WoW/Source/WowServices/GruntLogin.cpp
+@@ -58,6 +58,10 @@ bool GruntLogin::Disconnected() {
+     return false;
+ }
+ 
++#if defined(_WIN64)
++extern uint32_t g_coaGameBuild;   // CoA: RealmConnection.cpp
++#endif
++
+ // VERIFY: ca1d1b53 manual
+ // OFFSET: 0x008CA580
+ void GruntLogin::GetLogonMethod() {
+@@ -74,7 +78,11 @@ void GruntLogin::GetLogonMethod() {
+     logon.m_versionMajor = GAME_VERSION_MAJOR;
+     logon.m_versionMinor = GAME_VERSION_MINOR;
+     logon.m_versionPatch = GAME_VERSION_PATCH;
++#if defined(_WIN64)
++    logon.m_build = g_coaGameBuild;   // CoA: build do buildinfo (Extensions.dll, 0x8CA5F0)
++#else
+     logon.m_build = GAME_BUILD;
++#endif
+     logon.m_locale = SFile::s_locale;
+     logon.m_timeZone = OsGetTimeZone();
+ 
+diff --git a/WoW/Source/WowServices/RealmConnection.cpp b/WoW/Source/WowServices/RealmConnection.cpp
+index f3ec520..2c9de56 100644
+--- a/WoW/Source/WowServices/RealmConnection.cpp
++++ b/WoW/Source/WowServices/RealmConnection.cpp
+@@ -351,6 +351,14 @@ int32_t RealmConnection::HandleLogoutResponse(uint32_t msgId, uint32_t time, CDa
+     return 1;
+ }
+ 
++#if defined(_WIN64)
++// CoA: build lido do buildinfo pelo Extensions.dll (x86: imm16 dos push 0x3034 em 0x4648B3 e 0x8CA5F0; texto em 0x9F5200).
++// STATIC: 0x004648B3
++uint32_t g_coaGameBuild = GAME_BUILD;
++// STATIC: 0x009F5200
++char g_coaGameBuildString[8] = GAME_BUILD_STRING;
++#endif
++
+ // VERIFY: a1616851 manual
+ // OFFSET: 0x00464830
+ void RealmConnection::HandleAuthChallenge(AuthenticationChallenge* challenge) {
+@@ -366,7 +374,11 @@ void RealmConnection::HandleAuthChallenge(AuthenticationChallenge* challenge) {
+ 
+     WDataStore msg;
+     msg.Put(static_cast<uint32_t>(CMSG_AUTH_SESSION));
++#if defined(_WIN64)
++    msg.Put(static_cast<uint32_t>(g_coaGameBuild));   // CoA: build do buildinfo (Extensions.dll)
++#else
+     msg.Put(static_cast<uint32_t>(GAME_BUILD));
++#endif
+     msg.Put(static_cast<uint32_t>(this->m_loginData.m_loginServerID));
+     msg.PutString(this->m_loginData.m_account);
+     msg.Put(static_cast<uint32_t>(this->m_loginData.m_loginServerType));

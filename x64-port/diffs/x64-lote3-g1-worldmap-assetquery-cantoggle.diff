@@ -1,0 +1,43 @@
+diff --git a/src/Ascension/AscCanToggle.cpp b/src/Ascension/AscCanToggle.cpp
+index 4dd21bf..a547e02 100644
+--- a/src/Ascension/AscCanToggle.cpp
++++ b/src/Ascension/AscCanToggle.cpp
+@@ -143,7 +143,7 @@ namespace
+             reasons.push_back(enable ? 3 : 4);
+         if (enable)
+         {
+-            const int32_t type = p ? *reinterpret_cast<const int32_t*>(p + 0x14) : 0;
++            const int32_t type = p ? *reinterpret_cast<const int32_t*>(p + ASC_OFF(0x14, 0x24)) : 0;
+             if (!p || (type != 3 && type != 4) || static_cast<uint8_t>(*reinterpret_cast<const uint32_t*>(d + 0x5C) >> 8) != 10)
+                 reasons.push_back(5);
+             if (AscGameMode::Mode() & 8)
+diff --git a/src/Ascension/AscWorldMap.cpp b/src/Ascension/AscWorldMap.cpp
+index 6e658ee..58a2210 100644
+--- a/src/Ascension/AscWorldMap.cpp
++++ b/src/Ascension/AscWorldMap.cpp
+@@ -41,8 +41,13 @@ namespace
+         uint32_t zone;
+         if (!ReadNumber(L, zone))
+             return 0;
++#if ASC_X64
++        const uint32_t min = AscClientDbc::MinId(kWorldMapArea), max = AscClientDbc::MaxId(kWorldMapArea);
++        for (uint32_t id = min; id <= max; ++id)
++#else
+         const uint32_t min = *reinterpret_cast<const uint32_t*>(kWorldMapArea + 0x10);
+         for (uint32_t id = min; id <= *reinterpret_cast<const uint32_t*>(kWorldMapArea + 0x0C); ++id)
++#endif
+             if (const uint8_t* row = ClientDbcRow(kWorldMapArea, id))
+                 if (U32(row, 8) == zone)
+                 {
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -44,6 +44,8 @@
+         "AscAppearance", "AscAttachMisc", "AscCAFilter", "AscCallboardCache", "AscChallenge", "AscDraftMode",
+         "AscGlobalsC", "AscGlobalsI", "AscScrollOfFortune", "AscSmallApis", "AscCacheFiles", "AscLibrary",
+         "AscExtraActionButton",
++        // lote 3 (30/10, projects-2c) g1: Lua sobre DBC/DBCache do cliente (ASC_PTR/AscClientDbc conferidos).
++        "AscWorldMap", "AscAssetQuery", "AscCanToggle",
+         nullptr };
+ }
+ 

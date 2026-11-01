@@ -1,0 +1,9 @@
+# extra-addr exigido por x64-fixes-6a-4.diff (AscSpellVisuals: retorno do call r10 / vtable+0x178 em OnSpellGo)
+0x80ED4E @0x29D601
+# lote 3 (AscAppearance): cabecalho do ItemSet.dbc (WowClientDB 0xAD3EFC) -- max/min id; mesmo padrao do 0xAD4898/0xAD489C
+0xAD3F08 =0xAD3EFC+0x10
+0xAD3F0C =0xAD3EFC+0x14
+# lote 4 (AscSceneTransform): retorno do call GxXformSetViewport (0x681F60) em CSimpleMovieFrame::Render (0x95EED0)
+0x95EF4A @0x70CDE6
+# lote 4 (AscGeosets): retorno do UpdateDisplayInfo(0) (virtual, call [rax+0x38]) em CGUnit_C::PostReenable (0x7402B0)
+0x74030E @0x2DDD0F

@@ -1,0 +1,29 @@
+diff --git a/WoW/Source/Client.cpp b/WoW/Source/Client.cpp
+index 115d10c..44e6b0d 100644
+--- a/WoW/Source/Client.cpp
++++ b/WoW/Source/Client.cpp
+@@ -1670,6 +1670,12 @@ void ForEveryRunOnceWTF::Execute(int32_t (*callback)(const char*)) {
+     }
+ }
+ 
++#if defined(_WIN64)
++// CoA: -config do Extensions.dll (x86: imm32 do push "Config.wtf" em 0x406850).
++// STATIC: 0x00406851
++const char* g_coaConfigFile = "Config.wtf";
++#endif
++
+ // VERIFY: f4d6d325 manual
+ // OFFSET: 0x004067F0
+ bool InitializeGlobal() {
+@@ -1689,7 +1695,11 @@ bool InitializeGlobal() {
+ 
+     ClientServices::LoadCDKey();
+     ConsoleInitializeClientCommand();
++#if defined(_WIN64)
++    CVar::Initialize(g_coaConfigFile);   // CoA: -config do Extensions.dll (0x406851)
++#else
+     CVar::Initialize("Config.wtf");
++#endif
+     CVar::ArchiveCodeRegisteredOnly();
+ 
+     {

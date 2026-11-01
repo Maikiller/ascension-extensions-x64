@@ -1,0 +1,15 @@
+--- a/WoW/Source/Ui/MinimapFrame.cpp
++++ b/WoW/Source/Ui/MinimapFrame.cpp
+@@ -62,7 +62,11 @@
+ #include "Engine/Source/Event/CMouseEvent.h"
+ #include "Engine/Source/ShaderEffect/Types.h"
+ 
+-static const float MAX_POI_DISTANCE = 694.44446f;
++// CoA: era constante em .rdata; o Extensions.dll (SetPOIMaxRange, FUN_10a6bbc0) reescreve o valor em 0xA41E00.
++// Variavel com marca STATIC para o WowAddr(0xA41E00) apontar para ca. Ligacao externa (sem static) para o
++// compilador nao propagar o valor inicial como constante.
++// STATIC: 0x00A41E00
++float MAX_POI_DISTANCE = 694.44446f;
+ static const float ICON_SIZE = 0.0125f;
+ 
+ // STATIC: 0x00ACEBAC

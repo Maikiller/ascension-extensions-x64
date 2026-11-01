@@ -1,0 +1,590 @@
+diff --git a/src/Ascension/AscAccount.cpp b/src/Ascension/AscAccount.cpp
+index 0603cd5..b345d20 100644
+--- a/src/Ascension/AscAccount.cpp
++++ b/src/Ascension/AscAccount.cpp
+@@ -123,8 +123,16 @@ namespace
+         const uint32_t fltMax = 0x7F7FFFFF;
+         const uint8_t jmp = 0xEB;
+         PatchByte(0xA32904, &fltMax, 4);
++#if ASC_X64
++        (void)jmp;
++        static const uint8_t kJmp641[2] = {0xEB, 0x29}, kJe641[2] = {0x74, 0x29};   // Script_SendChatMessage+0x48A
++        static const uint8_t kJmp2B7[2] = {0xEB, 0x0F}, kJne2B7[2] = {0x75, 0x0F};   // Script_SendChatMessage+0x18A
++        AscX64::WriteCodeX64(0x50D641, kJmp641, 2, kJe641);
++        AscX64::WriteCodeX64(0x50D2B7, kJmp2B7, 2, kJne2B7);
++#else
+         PatchByte(0x50D641, &jmp, 1);
+         PatchByte(0x50D2B7, &jmp, 1);
++#endif
+     }
+ 
+     void Init()
+diff --git a/src/Ascension/AscCAMgr.cpp b/src/Ascension/AscCAMgr.cpp
+index af3ad79..b6ae930 100644
+--- a/src/Ascension/AscCAMgr.cpp
++++ b/src/Ascension/AscCAMgr.cpp
+@@ -308,7 +308,13 @@ namespace
+     {
+         static const uint8_t kAlways[3] = {0x39, 0xDB, 0x90};       // cmp ebx, ebx; nop
+         static const uint8_t kRunicPower[3] = {0x83, 0xFB, 0x06};   // cmp ebx, 6
++#if ASC_X64
++        // CGUnit_C::DoPowerRegen+0x90: cmp dil, 6 (40 80 FF 06) <-> cmp dil, dil; nop (40 38 FF 90)
++        static const uint8_t kAlwaysX64[4] = {0x40, 0x38, 0xFF, 0x90}, kRunicPowerX64[4] = {0x40, 0x80, 0xFF, 0x06};
++        AscX64::WriteCodeX64(0x728AA1, runeSpellKnown ? kAlwaysX64 : kRunicPowerX64, 4, runeSpellKnown ? kRunicPowerX64 : kAlwaysX64);
++#else
+         WriteCode(0x728AA1, runeSpellKnown ? kAlways : kRunicPower, 3);
++#endif
+     }
+ 
+     // FUN_10308830: while > 0, three client calls (0x5216F0 at 0x542679 / 0x5427BE / 0x54284E) are NOPed.
+@@ -478,9 +484,17 @@ namespace
+         if (g_removingSpell == spell)
+             return;
+         const uint8_t jmp = 0xEB, jne = 0x75;
++#if ASC_X64
++        (void)jmp; (void)jne;
++        static const uint8_t kJmpX64[2] = {0xEB, 0x17}, kJneX64[2] = {0x75, 0x17};   // CGActionBar::GetSpell+0x56
++        AscX64::WriteCodeX64(0x5A8C70, kJmpX64, 2, kJneX64);
++        g_5AAB90(spell);
++        AscX64::WriteCodeX64(0x5A8C70, kJneX64, 2, kJmpX64);
++#else
+         WriteCode(0x5A8C70, &jmp, 1);
+         g_5AAB90(spell);
+         WriteCode(0x5A8C70, &jne, 1);
++#endif
+     }
+ 
+     // LAB_10193f70 (0x10193F70), IsItemAction(slot): true when action slot 1..144 (0xC1E358, the client's
+diff --git a/src/Ascension/AscCamera.cpp b/src/Ascension/AscCamera.cpp
+index 03b7a9f..4a1efef 100644
+--- a/src/Ascension/AscCamera.cpp
++++ b/src/Ascension/AscCamera.cpp
+@@ -102,7 +102,12 @@ namespace
+         for (uint32_t at : {0x72E870u, 0x72E5FEu, 0x72E6AEu, 0x5FBC80u})
+             WriteByte(at, on ? 0xEB : 0x75);
+         static const uint8_t kCall[5] = {0xE8, 0x05, 0x09, 0xFD, 0xFF}, kNop5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
++#if ASC_X64
++        static const uint8_t kCallX64[5] = {0xE8, 0xF5, 0x83, 0xF6, 0xFF};   // Packet_Group_29+0x216: call ClearTrackingTarget
++        AscX64::WriteCodeX64(0x7569B6, on ? kNop5 : kCallX64, 5, on ? kCallX64 : kNop5);
++#else
+         WriteCode(0x7569B6, on ? kNop5 : kCall, 5);
++#endif
+         return 1;
+     }
+     int __cdecl OnTurnSpeed(void*, const char*, const char* value, void*)   // FUN_1019bcb0
+diff --git a/src/Ascension/AscClientGuards.cpp b/src/Ascension/AscClientGuards.cpp
+index 16d395a..3cdb7ed 100644
+--- a/src/Ascension/AscClientGuards.cpp
++++ b/src/Ascension/AscClientGuards.cpp
+@@ -35,9 +35,15 @@ namespace
+ 
+     void SkipCall68E4AD()   // FUN_10a4c0c0
+     {
++#if ASC_X64
++        // CGxDeviceD3d::DeviceSetBaseMipLevel+0x28: o x64 faz tail-jmp p/ CGxDevice::DeviceSetBaseMipLevel -> ret
++        static const uint8_t kRet[5] = {0xC3, 0x90, 0x90, 0x90, 0x90}, kJmpX64[5] = {0xE9, 0x23, 0x3B, 0xFE, 0xFF};
++        AscX64::WriteCodeX64(0x68E4AD, kRet, 5, kJmpX64);
++#else
+         uint8_t nops[11];
+         memset(nops, 0x90, sizeof(nops));
+         WriteCode(0x68E4AD, nops, sizeof(nops));   // HOOKED 0x68E4AD
++#endif
+     }
+ 
+     void MemoryGuard()   // FUN_10a3abd0
+diff --git a/src/Ascension/AscClientOptions.cpp b/src/Ascension/AscClientOptions.cpp
+index 7b390e9..f4ba10d 100644
+--- a/src/Ascension/AscClientOptions.cpp
++++ b/src/Ascension/AscClientOptions.cpp
+@@ -275,7 +275,12 @@ namespace
+         static const uint8_t kA[] = {0x74, 0x6F}, kB[] = {0x74, 0x07}, kC[] = {0x0D, 0x89, 0x00, 0x00, 0x00};
+         static const uint8_t kNop2[] = {0x90, 0x90}, kNop5[] = {0x90, 0x90, 0x90, 0x90, 0x90};
+         const bool on = IsOne(value);
++#if ASC_X64
++        static const uint8_t kAX64[2] = {0x74, 0x54};   // Spell_C_BeginCast+0x132: test [r14+0x24],0x800; je
++        AscX64::WriteCodeX64(0x80C8C1, on ? kNop2 : kAX64, 2, on ? kAX64 : kNop2);
++#else
+         PatchBytes(0x80C8C1, on ? kNop2 : kA);
++#endif
+         PatchBytes(0x80D7C1, on ? kNop2 : kB);
+         PatchBytes(0x80C91D, on ? kNop5 : kC);
+         return 1;
+@@ -286,7 +291,12 @@ namespace
+         static const uint8_t kA[] = {0x7E, 0x0B}, kB[] = {0x0F, 0x8E, 0xDD, 0x00, 0x00, 0x00};
+         static const uint8_t kNop2[] = {0x90, 0x90}, kNop6[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+         const bool on = IsOne(value);
++#if ASC_X64
++        static const uint8_t kAX64[2] = {0x7E, 0x0C};   // Script_UnitLevel+0xF4: jle
++        AscX64::WriteCodeX64(0x60FAB2, on ? kAX64 : kNop2, 2, on ? kNop2 : kAX64);
++#else
+         PatchBytes(0x60FAB2, on ? kA : kNop2);
++#endif
+         PatchBytes(0x621766, on ? kB : kNop6);
+         return 1;
+     }
+@@ -303,7 +313,12 @@ namespace
+     int __cdecl OnTargetName(void*, const char*, const char* value, void*)   // FUN_10a4a270
+     {
+         static const uint8_t kJe[] = {0x74, 0x42}, kNop[] = {0x90, 0x90};
++#if ASC_X64
++        static const uint8_t kJeX64[2] = {0x74, 0x3B};   // CGUnit_C::ShouldRenderObjectName+0xD2
++        AscX64::WriteCodeX64(0x729D3D, IsOne(value) ? kJeX64 : kNop, 2, IsOne(value) ? kNop : kJeX64);
++#else
+         PatchBytes(0x729D3D, IsOne(value) ? kJe : kNop);
++#endif
+         return 1;
+     }
+     int __cdecl OnSoundEnableFall(void*, const char*, const char* value, void*)   // FUN_10a47780
+diff --git a/src/Ascension/AscFontRender.cpp b/src/Ascension/AscFontRender.cpp
+index 5fdc431..1697dc5 100644
+--- a/src/Ascension/AscFontRender.cpp
++++ b/src/Ascension/AscFontRender.cpp
+@@ -356,9 +356,19 @@ namespace
+     void Init()
+     {
+         static const uint8_t kMovAl1[3] = {0xB0, 0x01, 0x90};
++#if ASC_X64
++        static const uint8_t kSetneX64[3] = {0x0F, 0x95, 0xC0};   // TEXTURECACHE::CreateTexture+0x24 (mesmos bytes do x86)
++        AscX64::WriteCodeX64(0x6CA067, kMovAl1, sizeof(kMovAl1), kSetneX64);
++#else
+         WriteCode(0x6CA067, kMovAl1, sizeof(kMovAl1));
++#endif
+         static const uint8_t kNop5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
++#if ASC_X64
++        static const uint8_t kCallX64[5] = {0xE8, 0x00, 0xCB, 0x57, 0x00};   // GxuFontInitialize+0x8B: call FT_Add_Default_Modules
++        AscX64::WriteCodeX64(0x6BE290, kNop5, sizeof(kNop5), kCallX64);
++#else
+         WriteCode(0x6BE290, kNop5, sizeof(kNop5));
++#endif
+ 
+         AscRuntime::ReplaceFunction(0x6C9C70, reinterpret_cast<void*>(&CopyGlyph));
+         AscRuntime::ReplaceFunction(0x6C9330, reinterpret_cast<void*>(&CopyGlyph));
+diff --git a/src/Ascension/AscGlobalsJ.cpp b/src/Ascension/AscGlobalsJ.cpp
+index 42a67e6..d296102 100644
+--- a/src/Ascension/AscGlobalsJ.cpp
++++ b/src/Ascension/AscGlobalsJ.cpp
+@@ -1214,10 +1214,15 @@ namespace
+         if (!ReadBool(L, allow))
+             return 0;
+         static const uint8_t kJe[6] = {0x0F, 0x84, 0x8D, 0x00, 0x00, 0x00};
++#if ASC_X64
++        static const uint8_t kJeX64[6] = {0x0F, 0x84, 0x8F, 0x00, 0x00, 0x00}, kNop6[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};   // PushUnitAura+0x344
++        AscX64::WriteCodeX64(0x614AF8, allow ? kNop6 : kJeX64, 6, allow ? kJeX64 : kNop6);
++#else
+         if (allow)
+             FillCode(0x614AF8, 0x90, 6);
+         else
+             WriteCode(0x614AF8, kJe, 6);
++#endif
+         return 1;
+     }
+ 
+@@ -1359,10 +1364,16 @@ namespace
+     int SetCurrencyShow(lua_State* L)
+     {
+         static const uint8_t kJe[6] = {0x0F, 0x84, 0xF9, 0x00, 0x00, 0x00};
++#if ASC_X64
++        static const uint8_t kJeX64[6] = {0x0F, 0x84, 0xED, 0x00, 0x00, 0x00}, kNop6[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};   // CGCurrencyTypes::BuildDisplayList+0x1DD
++        const bool show = ToInt(CheckNumber(L, 1)) != 0;
++        AscX64::WriteCodeX64(0x5B01C8, show ? kNop6 : kJeX64, 6, show ? kJeX64 : kNop6);
++#else
+         if (ToInt(CheckNumber(L, 1)) != 0)
+             FillCode(0x5B01C8, 0x90, 6);
+         else
+             WriteCode(0x5B01C8, kJe, 6);
++#endif
+         return 0;
+     }
+ 
+diff --git a/src/Ascension/AscGraphics.cpp b/src/Ascension/AscGraphics.cpp
+index b46678c..c60dbef 100644
+--- a/src/Ascension/AscGraphics.cpp
++++ b/src/Ascension/AscGraphics.cpp
+@@ -114,7 +114,13 @@ namespace
+         static const uint8_t kOn1[] = {0x0F, 0x84, 0xB5, 0x00, 0x00, 0x00}, kOn2[] = {0x75, 0x07};
+         static const uint8_t kOff1[] = {0xE9, 0xB6, 0x00, 0x00, 0x00, 0x00}, kOff2[] = {0x90, 0x90};
+         const bool on = IsOne(value);
++#if ASC_X64
++        // CWorldScene::RenderEntitys+0xBF (2o "if (model...)")
++        static const uint8_t kOn1X64[6] = {0x0F, 0x84, 0xD0, 0x00, 0x00, 0x00}, kOff1X64[6] = {0xE9, 0xD1, 0x00, 0x00, 0x00, 0x90};
++        AscX64::WriteCodeX64(0x793A45, on ? kOn1X64 : kOff1X64, 6, on ? kOff1X64 : kOn1X64);
++#else
+         PatchBytes(0x793A45, on ? kOn1 : kOff1);
++#endif
+         PatchBytes(0x7BBA22, on ? kOn2 : kOff2);
+         return 1;
+     }
+@@ -124,16 +130,29 @@ namespace
+         static const uint8_t kA[] = {0x0F, 0x84, 0xEA, 0x00, 0x00, 0x00}, kB[] = {0x0F, 0x85, 0xD9, 0x00, 0x00, 0x00},
+                              kC[] = {0x0F, 0x85, 0xC0, 0x00, 0x00, 0x00}, kNop[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+         const bool on = IsOne(value);
++#if ASC_X64
++        // CWorldScene::CullEntitys+0x94 / +0xA5 / +0xBE
++        static const uint8_t kAX64[6] = {0x0F, 0x84, 0xD7, 0x00, 0x00, 0x00}, kBX64[6] = {0x0F, 0x85, 0xC6, 0x00, 0x00, 0x00}, kCX64[6] = {0x0F, 0x85, 0xAD, 0x00, 0x00, 0x00};
++        AscX64::WriteCodeX64(0x793115, on ? kAX64 : kNop, 6, on ? kNop : kAX64);
++        AscX64::WriteCodeX64(0x793126, on ? kBX64 : kNop, 6, on ? kNop : kBX64);
++        AscX64::WriteCodeX64(0x79313F, on ? kCX64 : kNop, 6, on ? kNop : kCX64);
++#else
+         PatchBytes(0x793115, on ? kA : kNop);
+         PatchBytes(0x793126, on ? kB : kNop);
+         PatchBytes(0x79313F, on ? kC : kNop);
++#endif
+         return 1;
+     }
+     // FUN_102628b0
+     int __cdecl OnPortalCulling(void*, const char*, const char* value, void*)
+     {
+         static const uint8_t kOn[] = {0x74, 0x44}, kOff[] = {0x90, 0x90};
++#if ASC_X64
++        static const uint8_t kOnX64[2] = {0x74, 0x48};   // CMapObj::RenderInterior+0x153
++        AscX64::WriteCodeX64(0x7AD2EE, IsOne(value) ? kOnX64 : kOff, 2, IsOne(value) ? kOff : kOnX64);
++#else
+         PatchBytes(0x7AD2EE, IsOne(value) ? kOn : kOff);
++#endif
+         return 1;
+     }
+     // FUN_10262e10: also bit 0x20 of the terrain flags at 0xCD774C.
+@@ -165,10 +184,19 @@ namespace
+         static const uint8_t kA[] = {0x0F, 0x84, 0xC6, 0x00, 0x00, 0x00}, kB[] = {0x74, 0x11}, kC[] = {0x74, 0x5B},
+                              kD[] = {0x74, 0x1D}, kNop6[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, kNop2[] = {0x90, 0x90};
+         const bool on = IsOne(value);
++#if ASC_X64
++        // AddMapObjDefGroup+0x24 / +0x31; CullMapObjDefGroupFromExterior+0x9F / +0x88 (x64: bt edi,0x10; jae)
++        static const uint8_t kAX64[6] = {0x0F, 0x84, 0xFA, 0x00, 0x00, 0x00}, kBX64[2] = {0x74, 0x19}, kCX64[2] = {0x74, 0x51}, kDX64[2] = {0x73, 0x11};
++        AscX64::WriteCodeX64(0x792AF2, on ? kAX64 : kNop6, 6, on ? kNop6 : kAX64);
++        AscX64::WriteCodeX64(0x792AFF, on ? kBX64 : kNop2, 2, on ? kNop2 : kBX64);
++        AscX64::WriteCodeX64(0x7B3AAF, on ? kCX64 : kNop2, 2, on ? kNop2 : kCX64);
++        AscX64::WriteCodeX64(0x7B3A8E, on ? kDX64 : kNop2, 2, on ? kNop2 : kDX64);
++#else
+         PatchBytes(0x792AF2, on ? kA : kNop6);
+         PatchBytes(0x792AFF, on ? kB : kNop2);
+         PatchBytes(0x7B3AAF, on ? kC : kNop2);
+         PatchBytes(0x7B3A8E, on ? kD : kNop2);
++#endif
+         return 1;
+     }
+     // sub_10260f40: re-apply fogDistance and fogDensity with their current values.
+@@ -219,7 +247,13 @@ namespace
+         static const uint8_t kNop6[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, kNop3[] = {0x90, 0x90, 0x90};
+         const bool fixed = 498.0f < d;
+         PatchBytes(0x7ED982, fixed ? kNop6 : kA);
++#if ASC_X64
++        // DayNight::LoadLightingBands+0x1F9: movss [rbx+0x48], xmm0 (5 bytes). O par 0x7ED982 continua sem versao x64.
++        static const uint8_t kBX64[5] = {0xF3, 0x0F, 0x11, 0x43, 0x48}, kNop5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
++        AscX64::WriteCodeX64(0x7EC15A, fixed ? kNop5 : kBX64, 5, fixed ? kBX64 : kNop5);
++#else
+         PatchBytes(0x7EC15A, fixed ? kNop3 : kB);
++#endif
+         return 1;
+     }
+     // FUN_1025d130
+diff --git a/src/Ascension/AscManastorm.cpp b/src/Ascension/AscManastorm.cpp
+index d245cd0..b71191d 100644
+--- a/src/Ascension/AscManastorm.cpp
++++ b/src/Ascension/AscManastorm.cpp
+@@ -452,14 +452,28 @@ namespace
+         {
+             if (g_mgr.level != 0)
+             {
++#if ASC_X64
++                {
++                    static const uint8_t kJmp[2] = {0xEB, 0x0F}, kJne[2] = {0x75, 0x0F};   // Spell_C_ClickSpell+0xAF
++                    AscX64::WriteCodeX64(0x80DB37, kJmp, 2, kJne);
++                }
++#else
+                 WriteProtected<uint8_t>(0x80DB37, 0xEB);
++#endif
+                 SetSpellRangeFlags(0);
+             }
+         }
+         else if (g_mgr.level == 0)
+         {
+             SetObjectiveIconScale(1.0f);
++#if ASC_X64
++            {
++                static const uint8_t kJmp[2] = {0xEB, 0x0F}, kJne[2] = {0x75, 0x0F};
++                AscX64::WriteCodeX64(0x80DB37, kJne, 2, kJmp);
++            }
++#else
+             WriteProtected<uint8_t>(0x80DB37, 0x75);
++#endif
+             SetSpellRangeFlags(2);
+         }
+     }
+diff --git a/src/Ascension/AscModelMethods.cpp b/src/Ascension/AscModelMethods.cpp
+index 6ae13e9..f063deb 100644
+--- a/src/Ascension/AscModelMethods.cpp
++++ b/src/Ascension/AscModelMethods.cpp
+@@ -375,8 +375,20 @@ namespace
+     }
+     void SetFrameJumps(uint8_t op)
+     {
++#if ASC_X64
++        // x64: mesma forma curta (op rel8); o rel8 e o que se confere, o op atual pode ser 74/75/EB.
++        const struct { uint32_t at; uint8_t rel; } kSites[] = {{0x5971C1, 0x71}, {0x59714D, 0x53}};   // UpdateModel+0x15 / RotateModel+0x69
++        for (const auto& s : kSites)
++        {
++            const uint8_t* cur = static_cast<const uint8_t*>(ASC_PTR(s.at));
++            const uint8_t want[2] = {op, s.rel};
++            const uint8_t expect[2] = {cur && (cur[0] == 0x74 || cur[0] == 0x75 || cur[0] == 0xEB) ? cur[0] : uint8_t(0), s.rel};
++            AscX64::WriteCodeX64(s.at, want, 2, expect);
++        }
++#else
+         PatchByte(0x5971C1, op);
+         PatchByte(0x59714D, op);
++#endif
+     }
+ 
+     uint32_t g_spell = 0;    // 0x10D3DA04
+diff --git a/src/Ascension/AscNamePlates.cpp b/src/Ascension/AscNamePlates.cpp
+index bc40581..ed45596 100644
+--- a/src/Ascension/AscNamePlates.cpp
++++ b/src/Ascension/AscNamePlates.cpp
+@@ -585,7 +585,14 @@ namespace
+     {
+         static const uint8_t kSkip[] = {0x7E, 0x5F};
+         static const uint8_t kNop[] = {0x90, 0x90};
++#if ASC_X64
++        // CGUnit_C::ShouldShowNamePlate+0x2C: no x64 e jle NEAR (6 bytes)
++        static const uint8_t kSkipX64[6] = {0x0F, 0x8E, 0x07, 0x03, 0x00, 0x00}, kNop6[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
++        const bool skip = strcmp(value, "1") != 0;
++        AscX64::WriteCodeX64(0x72B07A, skip ? kSkipX64 : kNop6, 6, skip ? kNop6 : kSkipX64);
++#else
+         Patch(0x72B07A, strcmp(value, "1") != 0 ? kSkip : kNop, 2);
++#endif
+         return 1;
+     }
+     int __cdecl OnPersonalPosition(void*, const char*, const char* value, void*)   // sub_102bee20
+@@ -645,8 +652,16 @@ namespace
+         PatchValue<float*>(0x715739, &g_verticalOffset);
+         g_tokenGuid = reinterpret_cast<TokenGuid_t>(AscRuntime::Detour(0x60ABF0, 5, reinterpret_cast<void*>(&TokenGuidDetour)));
+         const uint8_t jmp = 0xEB;
++#if ASC_X64
++        (void)jmp;
++        static const uint8_t kJmp57D[2] = {0xEB, 0x18}, kJne57D[2] = {0x75, 0x18};   // ObjectNameVisibilityChanged+0x21
++        static const uint8_t kJmp586[2] = {0xEB, 0x0E}, kJne586[2] = {0x75, 0x0E};   // ObjectNameVisibilityChanged+0x2B
++        AscX64::WriteCodeX64(0x71557D, kJmp57D, 2, kJne57D);
++        AscX64::WriteCodeX64(0x715586, kJmp586, 2, kJne586);
++#else
+         Patch(0x71557D, &jmp, 1);
+         Patch(0x715586, &jmp, 1);
++#endif
+     }
+ 
+     const AscBindings::Binding kBindings[] = {
+diff --git a/src/Ascension/AscRealmData.cpp b/src/Ascension/AscRealmData.cpp
+index c6aff0e..8dc4c1a 100644
+--- a/src/Ascension/AscRealmData.cpp
++++ b/src/Ascension/AscRealmData.cpp
+@@ -391,7 +391,12 @@ namespace
+     void Init()
+     {
+         static const uint8_t kNop5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
++#if ASC_X64
++        static const uint8_t kCallX64[5] = {0xE8, 0xF7, 0x0A, 0x19, 0x00};   // InitializeClient+0x94: call DBCache_Initialize
++        AscX64::WriteCodeX64(0x4041BD, kNop5, 5, kCallX64);
++#else
+         WriteCode(0x4041BD, kNop5, 5);
++#endif
+         const char* initial = CommandLineArg("realmdata");
+         SetPath(initial ? initial : "");
+         g_openBase = reinterpret_cast<OpenBase_t>(AscRuntime::Detour(0x405DD0, 9, reinterpret_cast<void*>(&OpenBaseDetour)));
+diff --git a/src/Ascension/AscSpellMods.cpp b/src/Ascension/AscSpellMods.cpp
+index e2b22d1..3c2a856 100644
+--- a/src/Ascension/AscSpellMods.cpp
++++ b/src/Ascension/AscSpellMods.cpp
+@@ -97,6 +97,19 @@ namespace
+     }
+     void PatchByte(uint32_t at, uint8_t b) { Patch(at, &b, 1); }
+ 
++#if ASC_X64
++    // Bytes x64 (out/midpatch-x64.md). X64Code(at, on, a, b): grava `a` (on) ou `b`, conferindo o outro.
++    const uint8_t kJmp7370AF[2] = {0xEB, 0x07}, kJe7370AF[2] = {0x74, 0x07};         // CGUnit_C::SetSheatheState+0x1AD
++    const uint8_t kJmp73A0D0[2] = {0xEB, 0x29}, kStock73A0D0[2] = {0xC6, 0x44};      // CheckAndReportSpellInhibitFlags+0xA52
++    const uint8_t kNop80D6EF[5] = {0x90, 0x90, 0x90, 0x90, 0x90}, kCall80D6EF[5] = {0xE8, 0xA6, 0x67, 0x0D, 0x00};   // Spell_C_CastSpell+0x7E5: call PlaySoundKit
++    const uint8_t kJmp808323[2] = {0xEB, 0x24}, kJe808323[2] = {0x74, 0x24};         // Spell_C_SpellFailed+0x146
++    const uint8_t kJmp80DB37[2] = {0xEB, 0x0F}, kJne80DB37[2] = {0x75, 0x0F};        // Spell_C_ClickSpell+0xAF
++    void X64Code(uint32_t at, bool on, const uint8_t* a, const uint8_t* b, size_t n)
++    {
++        AscX64::WriteCodeX64(at, on ? a : b, n, on ? b : a);
++    }
++#endif
++
+     // FUN_10323d50: NOP 0x73A0D0..0x73A0EF while on, the stock bytes when off.
+     void SetCastPatch(bool on)
+     {
+@@ -104,14 +117,24 @@ namespace
+                                              0x0C, 0x00, 0x83, 0xC4, 0x18, 0x5B, 0x5F, 0x32, 0xC0, 0x5E, 0x8B, 0xE5, 0x5D, 0xC2, 0x0C, 0x00};
+         uint8_t nop[0x20];
+         memset(nop, 0x90, sizeof nop);
++#if ASC_X64
++        // x64: no inicio do bloco (mov byte [rsp+0x28],0) um jmp para o caminho seguinte (EB 29).
++        (void)nop; (void)kStock;
++        X64Code(0x73A0D0, on, kJmp73A0D0, kStock73A0D0, 2);
++#else
+         Patch(0x73A0D0, on ? nop : kStock, 0x20);
++#endif
+     }
+ 
+     // FUN_10326ff0: the jne at 0x80DB37 becomes a jmp while on, and SpellRange.dbc rows 0x72 / 0x1BD (client
+     // container 0xAD4988) get their flags (+0x14) = 0 (on) / 2 (off).
+     void SetAuraFlag(bool on)
+     {
++#if ASC_X64
++        X64Code(0x80DB37, on, kJmp80DB37, kJne80DB37, 2);
++#else
+         PatchByte(0x80DB37, on ? 0xEB : 0x75);
++#endif
+         for (uint32_t id : {0x72u, 0x1BDu})   // FUN_100b2590
+         {
+             if (uint32_t* flags = AscClientDbc::Field(0xAD4988, id, 0x14))   // SpellRange.dbc, gravacao no registro real
+@@ -478,7 +501,11 @@ namespace
+                 SetCastPatch(true);
+             for (uint32_t i = 0; i < 3; ++i)
+                 if (U32(rec, 0x17C + i * 4) == 0x4E)
++#if ASC_X64
++                    X64Code(0x7370AF, true, kJmp7370AF, kJe7370AF, 2);
++#else
+                     PatchByte(0x7370AF, 0xEB);
++#endif
+             const uint32_t family = U32(rec, 0x240);
+             if (family == 5)
+             {
+@@ -502,20 +529,34 @@ namespace
+                 static const uint8_t kStock[0x23] = {0xF6, 0x85, 0x58, 0xFD, 0xFF, 0xFF, 0x10, 0x6A, 0x00, 0x6A, 0x00, 0x6A,
+                                                      0x00, 0x74, 0x07, 0x68, 0xA4, 0x66, 0xA1, 0x00, 0xEB, 0x05, 0x68, 0xE4,
+                                                      0x3A, 0xA4, 0x00, 0xE8, 0x91, 0x9D, 0xCB, 0xFF, 0x83, 0xC4, 0x10};
++#if ASC_X64
++                X64Code(0x80D6EF, false, kNop80D6EF, kCall80D6EF, 5);
++                X64Code(0x808323, false, kJmp808323, kJe808323, 2);
++#else
+                 Patch(0x80D6EF, kStock, sizeof kStock);
+                 PatchByte(0x808323, 0x74);
++#endif
+             }
+             else
+             {
+                 uint8_t nop[0x23];
+                 memset(nop, 0x90, sizeof nop);
++#if ASC_X64
++                X64Code(0x80D6EF, true, kNop80D6EF, kCall80D6EF, 5);
++                X64Code(0x808323, true, kJmp808323, kJe808323, 2);
++#else
+                 Patch(0x80D6EF, nop, sizeof nop);
+                 PatchByte(0x808323, 0xEB);
++#endif
+             }
+         }
+         const uint32_t r = g_80CCE0(unit, spell, c, ASC_GUID2_A(d, e), f, g);
+         SetCastPatch(false);
++#if ASC_X64
++        X64Code(0x7370AF, false, kJmp7370AF, kJe7370AF, 2);
++#else
+         PatchByte(0x7370AF, 0x74);
++#endif
+         return r;
+     }
+ 
+diff --git a/src/Ascension/AscSpellTokens.cpp b/src/Ascension/AscSpellTokens.cpp
+index 7286043..d560f12 100644
+--- a/src/Ascension/AscSpellTokens.cpp
++++ b/src/Ascension/AscSpellTokens.cpp
+@@ -308,7 +308,10 @@ namespace
+         const uint8_t* bytes = jump ? kJump : kStock;
+         const size_t n = jump ? sizeof(kJump) : sizeof(kStock);
+ #if ASC_X64
+-        AscX64::WriteMem(0x62442C, bytes, n, __FUNCTION__);   // codigo: recusado ate ter bytes x64
++        // CGTooltip::SetSpell+0x431: jne (75 32) -> jmp (EB 32); pula o bloco inteiro do tempo de cast.
++        static const uint8_t kJumpX64[2] = {0xEB, 0x32}, kStockX64[2] = {0x75, 0x32};
++        (void)bytes; (void)n;
++        AscX64::WriteCodeX64(0x62442C, jump ? kJumpX64 : kStockX64, 2, jump ? kStockX64 : kJumpX64);
+         return;
+ #endif
+         DWORD old;
+diff --git a/src/Ascension/AscTooltipScaling.cpp b/src/Ascension/AscTooltipScaling.cpp
+index bf354f3..247824f 100644
+--- a/src/Ascension/AscTooltipScaling.cpp
++++ b/src/Ascension/AscTooltipScaling.cpp
+@@ -140,7 +140,13 @@ namespace
+     void Patch631760(bool restore)   // FUN_1027cf90
+     {
+         static const uint8_t kJmp[6] = {0xE9, 0xDF, 0x00, 0x00, 0x00, 0x90}, kJe[6] = {0x0F, 0x84, 0xDE, 0x00, 0x00, 0x00};
++#if ASC_X64
++        // CGItemStatsSummary::GetItemComparison+0x1E9 (a 1a CreateFromTooltip)
++        static const uint8_t kJmpX64[6] = {0xE9, 0xF7, 0x01, 0x00, 0x00, 0x90}, kJeX64[6] = {0x0F, 0x84, 0xF6, 0x01, 0x00, 0x00};
++        AscX64::WriteCodeX64(0x631760, restore ? kJeX64 : kJmpX64, 6, restore ? kJmpX64 : kJeX64);
++#else
+         WriteCode(0x631760, restore ? kJe : kJmp, 6);
++#endif
+     }
+ 
+     // FUN_1027adc0: the player's unit addon field 87 is set.
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+index 325a61c..faf76b4 100644
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -1,6 +1,7 @@
+ #include <Ascension/AscX64.hpp>
+ #include <Ascension/AscLog.hpp>
+ #include <Windows.h>
++#include <cstdio>
+ #include <cstring>
+ #if ASC_X64
+ #include <MinHook.h>
+@@ -146,6 +147,38 @@ bool WriteMem(uint32_t addr, const void* bytes, size_t n, const char*)
+ }
+ #endif
+ 
++#if ASC_X64
++bool WriteCodeX64(uint32_t addr, const void* bytes, size_t n, const void* expect)
++{
++    uint8_t* p = static_cast<uint8_t*>(Ptr(addr));
++    if (!p)
++    {
++        AscLog::Printf("x64: WriteCodeX64 0x%06X sem endereco x64 (falta a linha no extra-addr)", addr);
++        return false;
++    }
++    if (memcmp(p, bytes, n) == 0)
++        return true;   // ja aplicado
++    if (expect && memcmp(p, expect, n) != 0)
++    {
++        char found[3 * 16 + 1] = {};
++        for (size_t i = 0; i < n && i < 16; ++i)
++            sprintf_s(found + i * 3, sizeof(found) - i * 3, "%02X ", p[i]);
++        AscLog::Printf("x64: WriteCodeX64 0x%06X (%p): bytes nao conferem [%s] -- nao escrito", addr, p, found);
++        return false;
++    }
++    DWORD old;
++    if (!VirtualProtect(p, n, PAGE_EXECUTE_READWRITE, &old))
++    {
++        AscLog::Printf("x64: WriteCodeX64 0x%06X: VirtualProtect falhou (%lu)", addr, GetLastError());
++        return false;
++    }
++    memcpy(p, bytes, n);
++    VirtualProtect(p, n, old, &old);
++    FlushInstructionCache(GetCurrentProcess(), p, n);
++    return true;
++}
++#endif
++
+ bool ModulePorted(const char* name)
+ {
+ #if ASC_X64
+diff --git a/src/Ascension/AscX64.hpp b/src/Ascension/AscX64.hpp
+index 3c3e84c..fd56927 100644
+--- a/src/Ascension/AscX64.hpp
++++ b/src/Ascension/AscX64.hpp
+@@ -34,6 +34,13 @@ namespace AscX64
+     // executavel -- bytes de patch do x86 nao valem no codigo x64; esses patches precisam de versao propria.
+     bool WriteMem(uint32_t addr12340, const void* bytes, size_t n, const char* who);
+ 
++#if ASC_X64
++    // Patch de codigo no exe x64 (out/midpatch-x64.md): resolve addr12340 pela tabela (as linhas "fn +off" do
++    // extra-addr), confere que os n bytes atuais sao `expect` (ou ja sao `bytes`), e so entao escreve com
++    // VirtualProtect + FlushInstructionCache. Se nao bater, loga o que achou e nao escreve.
++    bool WriteCodeX64(uint32_t addr12340, const void* bytes, size_t n, const void* expect);
++#endif
++
+     // Lista branca dos modulos ja portados para x64 (nome do modulo em AscBindings).
+     bool ModulePorted(const char* name);
+ }

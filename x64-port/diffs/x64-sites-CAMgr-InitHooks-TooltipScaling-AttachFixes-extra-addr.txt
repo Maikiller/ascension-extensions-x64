@@ -1,0 +1,15 @@
+0x542679 @0x3F8AEB   # CGSpellBook::AddKnownSpell+0x5CB, call DisplayError (SuppressLearnCalls)
+0x5427BE @0x3F8BBF   # CGSpellBook::AddKnownSpell+0x69F
+0x54284E @0x3F8C3B   # CGSpellBook::AddKnownSpell+0x71B
+0x6E7346 @0x32D812   # CGPlayer_C::DelKnownSpell+0x202, call DisplayError unico (SuppressSupersedeCalls; 0x6E7356 fundido)
+0x6FD335 @0x2EEE41   # CGUnit_C::ComputeMissileTrajectory+0x7B1, byte 01 de mov [rsp+0x20],0x100111
+0x6FD4C7 @0x2EF143   # CGUnit_C::ComputeMissileTrajectory+0xAB3, idem
+0x6FD59E @0x2EF25C   # CGUnit_C::ComputeMissileTrajectory+0xBCC, idem
+0x756458 @0x35A0C1   # CGUnit_C::HandleCombatAnimEvent+0x1A1, je 74 0F
+0x62B98F @0x3B07C1   # CGTooltip::SetItem+0x6D1, if (stats->m_itemSet) je 74 5A (Patch62B98F)
+0x627980 @0x3B02FF   # CGTooltip::SetItem+0x20F, cmp [rdi+0x6C0],ecx; je -> xor r15d,r15d; jmp +0xB9 (Patch627980)
+0x6DC41D @0x32BBF2   # CGPlayer_C::CanUseItem+0x52, jg 0F 8F F9 00 00 00 (teste de pilha; Detour6DC3F0)
+0x584FBE @0x4E1043   # Script_GetMerchantItemInfo, retorno do call CanUseItem
+0x805DDD @0x2AB497   # Spell_C_StartSpellCooldown+0x87, jne 75 62 (-> EB 1E)
+0x805E2D @0x2AB4E8   # Spell_C_StartSpellCooldown+0xD8, jbe 76 11
+0x744A55 @0x2B98AA   # CGObject_C::PostInit+0x1A, call [rax+0x1C8] -> mov eax,flag

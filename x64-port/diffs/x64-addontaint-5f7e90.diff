@@ -1,0 +1,35 @@
+diff --git a/src/Ascension/AscAddonTaint.cpp b/src/Ascension/AscAddonTaint.cpp
+index f94b26a..3398703 100644
+--- a/src/Ascension/AscAddonTaint.cpp
++++ b/src/Ascension/AscAddonTaint.cpp
+@@ -56,7 +56,7 @@ namespace
+     FnL_t g_816DA0;
+     typedef int(__cdecl* Fn2_t)(uint32_t, uint32_t);
+     typedef int(__cdecl* Fn3_t)(uint32_t, uint32_t, uint32_t);
+-    typedef int(__cdecl* Fn5_t)(const char*, uint32_t, uint32_t, uint32_t, uint32_t);
++    typedef int(__cdecl* Fn5_t)(const char*, uint32_t, uintptr_t, uintptr_t, uintptr_t);   // IsAddOnLoadable: bool, Reason&, Reason&, const char*
+ 
+     Fn1_t g_5191C0, g_49F210, g_51A7A0, g_527F00, g_52B470, g_52B4E0, g_525FC0;
+     Fn0_t g_51AC90;
+@@ -179,12 +179,20 @@ namespace
+ 
+     // FUN_10312630. Refusals return with only the low byte cleared in the original (the rest is left
+     // over from a destructor); 0 here.
+-    int __cdecl Hook5F7E90(const char* name, uint32_t b, uint32_t c, uint32_t d, uint32_t e)
++    int __cdecl Hook5F7E90(const char* name, uint32_t b, uintptr_t c, uintptr_t d, uintptr_t e)
+     {
++#if ASC_X64
++        // x64: retornos dos calls em LoadAddOnFileCount (2o call) e LoadAddOn, via extra-addr (@0x38A884, @0x38A170).
++        void* const caller = _ReturnAddress();
++        if (!RealmInfoSvc::Get().trailingFlag && !AscAddons::IsKnown(name))
++            return 0;
++        if (caller == AscX64::Ptr(0x5F8076) || caller == AscX64::Ptr(0x5F80FF))
++#else
+         const uint32_t caller = reinterpret_cast<uint32_t>(_ReturnAddress());
+         if (!RealmInfoSvc::Get().trailingFlag && !AscAddons::IsKnown(name))
+             return 0;
+         if (caller == 0x5F8076 || caller == 0x5F80FF)
++#endif
+             if (CVar* cvar = CVar::Lookup("loadUnknownAddOns"))
+                 if (*reinterpret_cast<const int32_t*>(reinterpret_cast<const uint8_t*>(cvar) + ASC_OFF(0x30, 0x54)) == 0 &&
+                     !AscAddons::IsKnown(name))

@@ -1,0 +1,127 @@
+diff --git a/src/Ascension/AscAttachFixes.cpp b/src/Ascension/AscAttachFixes.cpp
+index 84977f5..6aa9de2 100644
+--- a/src/Ascension/AscAttachFixes.cpp
++++ b/src/Ascension/AscAttachFixes.cpp
+@@ -541,7 +541,7 @@ namespace
+         const int r = g_6904D0(ecx ASC_EDX_A(edx), a);
+         if (!g_gxMonitor)
+             return r;
+-        int32_t count = *reinterpret_cast<const int32_t*>(static_cast<uint8_t*>(g_gxMonitor) + 0x30);
++        int32_t count = *reinterpret_cast<const int32_t*>(static_cast<uint8_t*>(g_gxMonitor) + ASC_OFF(0x30, 0x54));
+         HWND window;
+         if (count == 0 || !(window = GetForegroundWindow()))
+             return r;
+diff --git a/src/Ascension/AscAttachLua.cpp b/src/Ascension/AscAttachLua.cpp
+index 07a977d..76dd14f 100644
+--- a/src/Ascension/AscAttachLua.cpp
++++ b/src/Ascension/AscAttachLua.cpp
+@@ -84,10 +84,10 @@ namespace
+     {
+         if (GetTop(L) >= 1)
+         {
+-            uint8_t* file = reinterpret_cast<uint8_t*>(ASC_PTR(0xB759D8));
++            uintptr_t* chatLog = reinterpret_cast<uintptr_t*>(ASC_PTR(0xB759D8));   // HSLOG s_chatLog[2]
+             if (reinterpret_cast<int(__cdecl*)(lua_State*, int, int)>(ASC_PTR(0x815500))(L, 1, 1))
+             {
+-                if (*reinterpret_cast<const uint32_t*>(file + 4) == 0)
++                if (chatLog[1] == 0)
+                 {
+                     char stamp[0x50];
+                     __time64_t now;
+@@ -100,9 +100,9 @@ namespace
+             }
+             else
+             {
+-                if (*reinterpret_cast<const uint32_t*>(file + 4) != 0)
+-                    reinterpret_cast<void(__cdecl*)(uintptr_t)>(ASC_PTR(0x7754A0))(*reinterpret_cast<const uint32_t*>(file + 4));
+-                *reinterpret_cast<uint32_t*>(file + 4) = 0;
++                if (chatLog[1] != 0)
++                    reinterpret_cast<void(__cdecl*)(uintptr_t)>(ASC_PTR(0x7754A0))(chatLog[1]);
++                chatLog[1] = 0;
+             }
+         }
+         return g_4FBD20(L);
+diff --git a/src/Ascension/AscGlobalsJ.cpp b/src/Ascension/AscGlobalsJ.cpp
+index d296102..c0fb8ab 100644
+--- a/src/Ascension/AscGlobalsJ.cpp
++++ b/src/Ascension/AscGlobalsJ.cpp
+@@ -522,7 +522,7 @@ namespace
+     {
+         CallWithPatchedPush(0x5FC6C0, 0x5FC6C8, L);
+         const uint8_t* worldFrame = *reinterpret_cast<const uint8_t* const*>(ASC_PTR(0xB7436C));
+-        ClickTerrain(reinterpret_cast<const float*>(worldFrame + 0x2E8));
++        ClickTerrain(reinterpret_cast<const float*>(worldFrame + ASC_OFF(0x2E8, 0x4C8)));
+         CallWithPatchedPush(0x5FC730, 0x5FC73B, L);
+         return 0;
+     }
+diff --git a/src/Ascension/AscItemCollections.cpp b/src/Ascension/AscItemCollections.cpp
+index cd5c245..097aa84 100644
+--- a/src/Ascension/AscItemCollections.cpp
++++ b/src/Ascension/AscItemCollections.cpp
+@@ -383,7 +383,7 @@ namespace
+             *out = g_humanMaleValue;
+             return r;
+         }
+-        const char* path = reinterpret_cast<const char*>(*reinterpret_cast<const uint8_t* const*>(static_cast<uint8_t*>(ecx) + 0x2C) + 0x3C);
++        const char* path = reinterpret_cast<const char*>(*reinterpret_cast<const uint8_t* const*>(static_cast<uint8_t*>(ecx) + ASC_OFF(0x2C, 0x48)) + ASC_OFF(0x3C, 0x74));
+         if (reinterpret_cast<int(__stdcall*)(const char*, const char*, size_t)>(ASC_PTR(0x76E780))(path, "character\\human\\male\\humanmale.m2", 0x7FFFFFFF) == 0)
+             g_humanMaleValue = *out;
+         return r;
+diff --git a/src/Ascension/AscModelMethods.cpp b/src/Ascension/AscModelMethods.cpp
+index f063deb..b6cc666 100644
+--- a/src/Ascension/AscModelMethods.cpp
++++ b/src/Ascension/AscModelMethods.cpp
+@@ -47,7 +47,7 @@ namespace
+     void* ModelOf(lua_State* L)   // frame +0x2A0
+     {
+         uint8_t* frame = static_cast<uint8_t*>(Self(L));
+-        return frame ? *reinterpret_cast<void**>(frame + 0x2A0) : nullptr;
++        return frame ? *reinterpret_cast<void**>(frame + ASC_OFF(0x2A0, 0x460)) : nullptr;
+     }
+ 
+     // ---- client CM2Model calls ------------------------------------------------------------------------
+@@ -134,7 +134,7 @@ namespace
+         const uint8_t* e = SpellVisualEffectName(effectName);
+         if (!e)
+             return false;
+-        void* scene = *reinterpret_cast<void**>(static_cast<uint8_t*>(model) + 0x28);
++        void* scene = *reinterpret_cast<void**>(static_cast<uint8_t*>(model) + ASC_OFF(0x28, 0x40));
+         void* fx = reinterpret_cast<void*(__thiscall*)(void*, const char*, int)>(ASC_PTR(0x81F8F0))(
+             scene, AscClientDbc::Str(e, 8), 0);
+         if (!fx)
+@@ -283,7 +283,7 @@ namespace
+             else
+                 attach = hasAttach(0x13) ? 0x13 : -1;
+         }
+-        void* scene = *reinterpret_cast<void**>(static_cast<uint8_t*>(m.model) + 0x28);
++        void* scene = *reinterpret_cast<void**>(static_cast<uint8_t*>(m.model) + ASC_OFF(0x28, 0x40));
+         m.fx = reinterpret_cast<void*(__thiscall*)(void*, const char*, int)>(ASC_PTR(0x81F8F0))(scene, AscClientDbc::Str(e, 8), 0);
+         if (!m.fx)
+             return;
+@@ -306,7 +306,7 @@ namespace
+             attachPos(hand, 0x22);
+         attachPos(origin, attach);
+         // Gnome models are measured 0.75 lower (DLL 0x10B2F5D4).
+-        const char* file = reinterpret_cast<const char*>(*reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(m.model) + 0x2C) + 0x3C);
++        const char* file = reinterpret_cast<const char*>(*reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(m.model) + ASC_OFF(0x2C, 0x48)) + ASC_OFF(0x3C, 0x74));
+         float z = origin[2];
+         if (strcmp(file, "character\\gnome\\male\\gnomemale.m2") == 0 || strcmp(file, "character\\gnome\\female\\gnomefemale.m2") == 0)
+             z -= 0.75f;
+@@ -322,7 +322,7 @@ namespace
+         Missile& m = g_missile;
+         // Deviation: our timer can run before a freshly set model has its M2 data (+0x2C); the
+         // attachment calls fault on it (0x8273D0), so launch waits for it.
+-        if (m.start != 0 && Now() >= m.start && *reinterpret_cast<void**>(static_cast<uint8_t*>(m.model) + 0x2C))
++        if (m.start != 0 && Now() >= m.start && *reinterpret_cast<void**>(static_cast<uint8_t*>(m.model) + ASC_OFF(0x2C, 0x48)))
+             MissileLaunch(m);
+         if (m.fx && m.loop)
+         {
+@@ -353,7 +353,7 @@ namespace
+         g_missile.start = start ? start : Now();
+         g_missile.loop = loop;
+         if (clear)
+-            *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(model) + 0x17C) = 0;
++            *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(model) + ASC_OFF(0x17C, 0x20C)) = 0;
+         if (!g_missileTimer)
+             g_missileTimer = AscRuntime::Schedule(16, MissileTick, nullptr);
+         return true;

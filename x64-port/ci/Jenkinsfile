@@ -1,0 +1,65 @@
+// CoA x64 (WowClient64 + Extensions64/32): job de build.
+// Dispara com push no ext (x64) ou no fonte do cliente (coa-cliente-*).
+// Compila no host de build (que manda para a maquina Windows), roda as conferencias e arquiva os artefatos la
+// (out/cliente-<src>/, out/Extensions64-<ext>.*). Publicar e outro job, manual.
+// Variaveis globais do Jenkins: COA_BUILD_HOST (host de build), COA_WORK (raiz de trabalho nele),
+// COA_GIT_BASE (URL base dos repos), COA_CLIENT_REPO (repo do fonte do cliente). Credenciais: build-server-ssh, forgejo-https.
+pipeline {
+    agent { label 'built-in' }
+    options {
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '40'))
+        timeout(time: 90, unit: 'MINUTES')
+        quietPeriod(30)    // >= 2 min com pollSCM H/2 adiava o build para sempre (cada poll reinicia a espera)
+    }
+    triggers { pollSCM('H/2 * * * *') }
+    parameters {
+        string(name: 'EXT', defaultValue: 'x64', description: 'ascension-extensions-x64: branch ou SHA')
+        string(name: 'SRC', defaultValue: 'coa-cliente-20261031', description: 'fonte do cliente: branch ou SHA')
+        booleanParam(name: 'FORCAR_CLIENTE', defaultValue: false, description: 'Recompila o cliente mesmo sem mudanca no src')
+    }
+    environment {
+        BUILD_SERVER = "${env.COA_BUILD_HOST}"
+        SSH_OPTS = '-o StrictHostKeyChecking=no -o ServerAliveInterval=30'
+    }
+    stages {
+        stage('Checkout (polling)') {
+            steps {
+                // So para o Jenkins acompanhar os dois repos; o build usa os clones do host de build.
+                dir('ext') { git url: "${env.COA_GIT_BASE}/ascension-extensions-x64.git", branch: 'x64', credentialsId: 'forgejo-https', poll: true, changelog: true }
+                dir('src') { git url: "${env.COA_GIT_BASE}/${env.COA_CLIENT_REPO}.git", branch: 'coa-cliente-20261031', credentialsId: 'forgejo-https', poll: true, changelog: true }
+                script {
+                    def pe = params.EXT ?: 'x64'; def ps = params.SRC ?: 'coa-cliente-20261031'
+                    env.EXT_SHA = (pe == 'x64') ? sh(script: 'git -C ext rev-parse HEAD', returnStdout: true).trim() : pe
+                    env.SRC_SHA = (ps == 'coa-cliente-20261031') ? sh(script: 'git -C src rev-parse HEAD', returnStdout: true).trim() : ps
+                    env.FORCAR = params.FORCAR_CLIENTE ? '1' : '0'
+                    env.SRC7 = env.SRC_SHA.take(7)
+                    currentBuild.description = "ext ${env.EXT_SHA.take(7)} src ${env.SRC_SHA.take(7)}"
+                }
+            }
+        }
+        stage('Build + conferencias') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'build-server-ssh', usernameVariable: 'BS_USER', passwordVariable: 'BS_PASS')]) {
+                    sh '''
+                        sshpass -p "$BS_PASS" ssh $SSH_OPTS "$BS_USER@$BUILD_SERVER" \
+                          "bash $COA_WORK/ext/x64-port/ci/ci-build.sh $EXT_SHA $SRC_SHA $FORCAR"
+                    '''
+                }
+            }
+        }
+    }
+    post {
+        always {
+            withCredentials([usernamePassword(credentialsId: 'build-server-ssh', usernameVariable: 'BS_USER', passwordVariable: 'BS_PASS')]) {
+                sh '''
+                    rm -rf relatorio && mkdir relatorio
+                    for f in ultimo.txt "rebase-${SRC7:-x}-chkexpect.txt" "rebase-${SRC7:-x}-chkretaddr.txt"; do
+                      sshpass -p "$BS_PASS" scp $SSH_OPTS "$BS_USER@$BUILD_SERVER:$COA_WORK/out/ci/$f" relatorio/ 2>/dev/null || true
+                    done
+                '''
+            }
+            archiveArtifacts artifacts: 'relatorio/*', allowEmptyArchive: true
+        }
+    }
+}

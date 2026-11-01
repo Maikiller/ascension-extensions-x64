@@ -1,0 +1,34 @@
+diff --git a/WoW/Source/DB/DBClient/DBClient.cpp b/WoW/Source/DB/DBClient/DBClient.cpp
+index 66dd052..810190c 100644
+--- a/WoW/Source/DB/DBClient/DBClient.cpp
++++ b/WoW/Source/DB/DBClient/DBClient.cpp
+@@ -1122,6 +1122,11 @@ void InitWeaponSubclasses() {
+     }
+ }
+ 
++#if defined(_WIN64)
++// STATIC: 0x00634E30
++void (*g_coaClientDbLoadAll)() = nullptr;
++#endif
++
+ // VERIFY: f26ccc9b auto
+ // OFFSET: 0x00634E00
+ void ClientDBInitialize() {
+@@ -1140,7 +1145,17 @@ void ClientDBInitialize() {
+         }
+     }
+ 
++#if defined(_WIN64)
++    // CoA: o Extensions.dll (CDBCMgr::Register = RegisterBaseEx + Load) substitui o carregamento.
++    if (g_coaClientDbLoadAll) {
++        g_coaClientDbLoadAll();
++    } else {
++        StaticDBLoadAll(&WowClientDB_Base::Load);
++    }
++
++#else
+     StaticDBLoadAll(&WowClientDB_Base::Load);
++#endif
+     GameTablesInitialize();
+     InitResistances();
+     InitTerrainTypeFlags();

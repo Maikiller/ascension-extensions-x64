@@ -1,0 +1,13 @@
+--- a/WoW/Source/Ui/MinimapFrame_Scripts.cpp
++++ b/WoW/Source/Ui/MinimapFrame_Scripts.cpp
+@@ -184,7 +184,9 @@
+ // VERIFY: e417bf52 manual
+ // OFFSET: 0x0057BF50
+ static int32_t Script_GetZoomLevels(lua_State* L) {
+-    lua_pushnumber(L, static_cast<uint32_t>(MinimapGetZoomLevels()));
++    // CoA: o Extensions.dll (sub_10a4e9f0 sobre 0x7F3B60) devolve 8 em vez de 6 quando o chamador e este
++    // (retorno 0x57BF59); os outros usos de MinimapGetZoomLevels continuam com 6.
++    lua_pushnumber(L, static_cast<uint32_t>(8));
+     return 1;
+ }
+ 

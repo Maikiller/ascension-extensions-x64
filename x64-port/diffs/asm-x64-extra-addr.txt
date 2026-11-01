@@ -1,0 +1,3 @@
+# extra-addr exigido por asm-x64.diff (AscGlobalsJ: endereco de retorno testado pelos detours)
+0x75520B @0x2DBA6B   # CGUnit_C::PlayAttackerRound+0x10B, retorno do call PlayBaseAnimation (Detour7385C0)
+0x4F7FB6 @0x3F04E4   # CGWorldFrame::CursorTrackUnit+0x4E4, retorno do call GetMeleeRange (Detour4F5F40)

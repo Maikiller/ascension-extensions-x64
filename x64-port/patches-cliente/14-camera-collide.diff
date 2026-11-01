@@ -1,0 +1,29 @@
+diff --git a/WoW/Source/UIUtil/Camera.cpp b/WoW/Source/UIUtil/Camera.cpp
+index a895957..0a9e835 100644
+--- a/WoW/Source/UIUtil/Camera.cpp
++++ b/WoW/Source/UIUtil/Camera.cpp
+@@ -3628,6 +3628,12 @@ void CGCamera::UpdateUncontrolledState(int32_t uncontrolled) {
+     }
+ }
+ 
++#if defined(_WIN64)
++// CoA: OnM2Collision do Extensions.dll (x86: imm32 0x100171 em 0x605E13; desligado = 0x170).
++// STATIC: 0x00605E13
++uint32_t g_coaCameraCollideFlags = 0x100171;
++#endif
++
+ // VERIFY: 13ff6f44 manual
+ // OFFSET: 0x00605D60
+ uint32_t CGCamera::CollideCameraWithWorld(const C3Vector& target, float& distance, float& height, const C3Vector& offset, float liquid, float& extent) {
+@@ -3642,7 +3648,11 @@ uint32_t CGCamera::CollideCameraWithWorld(const C3Vector& target, float& distanc
+         return 0;
+     }
+ 
++#if defined(_WIN64)
++    uint32_t flags = (s_cameraWaterCollision->m_intValue ? 0x20000 : 0) + g_coaCameraCollideFlags;   // CoA: 0x605E13
++#else
+     uint32_t flags = s_cameraWaterCollision->m_intValue ? 0x120171 : 0x100171;
++#endif
+     float minHeight = 0.83333331f;
+     float maxHeight = this->m_height;
+ 

@@ -1,0 +1,34 @@
+diff --git a/WoW/Source/Ui/GameUI.cpp b/WoW/Source/Ui/GameUI.cpp
+index a0a8128..015535d 100644
+--- a/WoW/Source/Ui/GameUI.cpp
++++ b/WoW/Source/Ui/GameUI.cpp
+@@ -1677,6 +1677,11 @@ int32_t CGGameUI::CanPerformAction(uint32_t action) {
+     return 1;
+ }
+ 
++#if defined(_WIN64)
++// STATIC: 0x0052AB26
++void (*g_coaCreateScriptEvents)(const char** names, uint32_t count) = nullptr;
++#endif
++
+ // VERIFY: a126fb23 manual
+ // OFFSET: 0x0052A980
+ void CGGameUI::InitializeFrameXML() {
+@@ -1726,7 +1731,17 @@ void CGGameUI::InitializeFrameXML() {
+     FrameScript_Destroy();
+     FrameScript_Initialize(g_scriptProfileCVar->m_intValue);
+     LoadScriptFunctions();
++#if defined(_WIN64)
++    // CoA: o Extensions.dll (FrameScript::ApplyPatches, rel32 do call em 0x52AB25) troca este call pelo RegisterEventEx
++    // dele (eventos customizados). Ponteiro gravado pelo ext; nulo = o original.
++    if (g_coaCreateScriptEvents) {
++        g_coaCreateScriptEvents(g_scriptEvents, NUM_SCRIPT_EVENTS);
++    } else {
++        FrameScript_CreateEvents(g_scriptEvents, NUM_SCRIPT_EVENTS);
++    }
++#else
+     FrameScript_CreateEvents(g_scriptEvents, NUM_SCRIPT_EVENTS);
++#endif
+     CGGameUI::RegisterGameCVars();
+     CGUIBindings::Initialize();
+     CGWorldFrame::RegisterFrames();

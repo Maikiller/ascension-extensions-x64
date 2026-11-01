@@ -1,0 +1,79 @@
+--- a/WoW/Source/Object/ObjectClient/Object_C.h
++++ b/WoW/Source/Object/ObjectClient/Object_C.h
+@@ -210,6 +210,7 @@
+     void UpdateEffectAttachments();
+     void Fadeout();
+     static void __stdcall BuildSelectionRotMatrix(C44Matrix* matrix, const C3Vector* position);
++    static void CoaBuildSelectionRotMatrix(const CGObject_C* object, C44Matrix* matrix, const C3Vector* position);
+     static int32_t SetCircleRenderStates();
+     void SetModelFinish(CM2Model* model);
+     void SetModel(CM2Model* model);
+--- a/WoW/Source/Object/ObjectClient/Object_C.cpp
++++ b/WoW/Source/Object/ObjectClient/Object_C.cpp
+@@ -1971,6 +1971,26 @@
+     matrix->RotateAroundZ(-CalculateFacingTo(&camera, position));
+ }
+ 
++// CoA: Extensions.dll (sub_10a44df0 sobre 0x744150). Com a textura de seta (ObjectSelectionCircleTexture 2 ou 3,
++// CVar registrada pelo DLL) o circulo gira com o objeto: matriz identidade, -GetRenderFacing() (vtable +0x94 no x86)
++// e meia volta; senao, o original. No x86 o DLL lia o objeto do ecx que o chamador deixava (o this de quem desenha).
++void CGObject_C::CoaBuildSelectionRotMatrix(const CGObject_C* object, C44Matrix* matrix, const C3Vector* position) {
++    static CVar* s_circleTexture = nullptr;
++
++    if (!s_circleTexture) {
++        s_circleTexture = CVar::Lookup("ObjectSelectionCircleTexture");
++    }
++
++    if (object && object->m_obj && s_circleTexture && (s_circleTexture->m_intValue == 2 || s_circleTexture->m_intValue == 3)) {
++        *matrix = C44Matrix();
++        matrix->RotateAroundZ(-object->GetRenderFacing());
++        matrix->RotateAroundZ(3.14159274f);
++        return;
++    }
++
++    CGObject_C::BuildSelectionRotMatrix(matrix, position);
++}
++
+ // VERIFY: ab1865e5 manual
+ // OFFSET: 0x00744EB0
+ int32_t CGObject_C::SetCircleRenderStates() {
+--- a/WoW/Source/Object/ObjectClient/Unit_C.cpp
++++ b/WoW/Source/Object/ObjectClient/Unit_C.cpp
+@@ -2235,7 +2235,7 @@
+     C3Vector position = this->m_movementData.GetPosition(CGUnit_C::s_trackingPosition);
+     CAaBox box(C3Vector(position.x - size, position.y - size, position.z - size), C3Vector(position.x + size, position.y + size, position.z + size));
+     C44Matrix matrix;
+-    this->BuildSelectionRotMatrix(&matrix, &CGUnit_C::s_trackingPosition);
++    CGObject_C::CoaBuildSelectionRotMatrix(this, &matrix, &CGUnit_C::s_trackingPosition);   // CoA: seta do circulo
+     g_theGxDevicePtr->RsPush();
+ 
+     if (this->SetCircleRenderStates()) {
+@@ -23190,7 +23190,7 @@
+     this->GetSelectionHighlightColor(&color);
+ 
+     C44Matrix matrix;
+-    CGObject_C::BuildSelectionRotMatrix(&matrix, &position);
++    CGObject_C::CoaBuildSelectionRotMatrix(this, &matrix, &position);   // CoA: seta do circulo
+     g_theGxDevicePtr->RsPush();
+     int32_t states = CGObject_C::SetCircleRenderStates();
+ 
+@@ -23267,7 +23267,7 @@
+     box.Expand(amount);
+ 
+     C44Matrix matrix;
+-    CGObject_C::BuildSelectionRotMatrix(&matrix, &position);
++    CGObject_C::CoaBuildSelectionRotMatrix(this, &matrix, &position);   // CoA: seta do circulo
+     g_theGxDevicePtr->RsPush();
+ 
+     if (CGObject_C::SetCircleRenderStates()) {
+--- a/WoW/Source/Object/ObjectClient/Corpse_C.cpp
++++ b/WoW/Source/Object/ObjectClient/Corpse_C.cpp
+@@ -539,7 +539,7 @@
+     box.b.z = position.z - (size + size);
+     C44Matrix matrix;
+     C3Vector center = this->GetPosition();
+-    CGObject_C::BuildSelectionRotMatrix(&matrix, &center);
++    CGObject_C::CoaBuildSelectionRotMatrix(this, &matrix, &center);   // CoA: seta do circulo
+     g_theGxDevicePtr->RsPush();
+ 
+     if (CGObject_C::SetCircleRenderStates()) {

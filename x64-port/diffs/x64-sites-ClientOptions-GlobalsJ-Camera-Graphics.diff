@@ -1,0 +1,423 @@
+diff --git a/src/Ascension/AscCamera.cpp b/src/Ascension/AscCamera.cpp
+index f2cced6..1cb576c 100644
+--- a/src/Ascension/AscCamera.cpp
++++ b/src/Ascension/AscCamera.cpp
+@@ -56,6 +56,13 @@ namespace
+     }
+     void WriteByte(uint32_t at, uint8_t v) { WriteCode(at, &v, 1); }
+     bool IsOne(const char* value) { return value && strcmp(value, "1") == 0; }
++#if ASC_X64
++    // x64: troca os bytes de um site entre dois estados (bytes do WowClient64; o expect e o outro estado).
++    void Toggle(uint32_t at, const uint8_t* want, const uint8_t* other, size_t n)
++    {
++        AscX64::WriteCodeX64(at, want, n, other);
++    }
++#endif
+ 
+     // The CVars (the original's slots 0x10BDECF0 ..), found after registration.
+     CVar* Var(const char* name)
+@@ -87,20 +94,39 @@ namespace
+     // ---- CVar callbacks ------------------------------------------------------------------------------------
+     int __cdecl OnActionCam(void*, const char*, const char* value, void*)   // FUN_10199420
+     {
++#if ASC_X64
++        // CGCamera::IsBobbingAllowed+0x21: o x64 sai pelo ja (77 7D); o jp->jmp do x86 vira NOP.
++        static const uint8_t kJa[2] = {0x77, 0x7D}, kNop2[2] = {0x90, 0x90};
++        if (IsOne(value))
++            Toggle(0x5FFD34, kJa, kNop2, 2);
++#else
+         if (IsOne(value))
+             WriteByte(0x5FFD34, 0x7A);
++#endif
+         return 1;
+     }
+     int __cdecl OnHeadBobs(void*, const char*, const char* value, void*)   // FUN_10199da0
+     {
++#if ASC_X64
++        static const uint8_t kJa[2] = {0x77, 0x7D}, kNop2[2] = {0x90, 0x90};
++        Toggle(0x5FFD34, IsOne(value) ? kNop2 : kJa, IsOne(value) ? kJa : kNop2, 2);
++#else
+         WriteByte(0x5FFD34, IsOne(value) ? 0xEB : 0x7A);
++#endif
+         return 1;
+     }
+     int __cdecl OnEnemyFocus(void*, const char*, const char* value, void*)   // FUN_1019a9e0
+     {
+         const bool on = IsOne(value);
++#if ASC_X64
++        // Os 4 jne antes de ClearTrackingTarget (OnTurn/OnMove/OnStrafeStartLocal, UpdatePlayer): so o opcode muda.
++        const uint8_t want = on ? 0xEB : 0x75, other = on ? 0x75 : 0xEB;
++        for (uint32_t at : {0x72E870u, 0x72E5FEu, 0x72E6AEu, 0x5FBC80u})
++            Toggle(at, &want, &other, 1);
++#else
+         for (uint32_t at : {0x72E870u, 0x72E5FEu, 0x72E6AEu, 0x5FBC80u})
+             WriteByte(at, on ? 0xEB : 0x75);
++#endif
+         static const uint8_t kCall[5] = {0xE8, 0x05, 0x09, 0xFD, 0xFF}, kNop5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
+ #if ASC_X64
+         static const uint8_t kCallX64[5] = {0xE8, 0xF5, 0x83, 0xF6, 0xFF};   // Packet_Group_29+0x216: call ClearTrackingTarget
+@@ -114,8 +140,18 @@ namespace
+     {
+         uint8_t nops[32];
+         memset(nops, 0x90, sizeof(nops));
++#if ASC_X64
++        // O x86 tira o fld..fstp para s_trackingTurnRate (0xCA11DC); no x64 basta o movss que grava.
++        // CGPlayer_C::ClickToMove+0x153 e CGUnit_C::HandleTrackingFacing+0xF7. (O NOP do x86 em 0x731720 deixava
++        // o valor na pilha do x87 para o fcom seguinte; no SSE o compare usa xmm1 e nao muda.)
++        static const uint8_t k727520X64[8] = {0xF3, 0x0F, 0x11, 0x05, 0x91, 0x00, 0x76, 0x00};
++        static const uint8_t k731720X64[8] = {0xF3, 0x0F, 0x11, 0x05, 0x7D, 0x43, 0x75, 0x00};
++        Toggle(0x727520, nops, k727520X64, 8);
++        Toggle(0x731720, nops, k731720X64, 8);
++#else
+         WriteCode(0x727520, nops, 32);
+         WriteCode(0x731720, nops, 6);
++#endif
+         const float v = static_cast<float>(atof(value));
+         float r = v < 0.5f ? 0.5f : v;   // cmovbe pair: NaN passes through, as in the original
+         if (v > 16.5f)
+@@ -127,7 +163,15 @@ namespace
+     {
+         static const uint8_t kStore[6] = {0xD9, 0x98, 0x78, 0x01, 0x00, 0x00}, kNop6[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+         const bool on = IsOne(value);
++#if ASC_X64
++        // CWorldScene::AddDoodadDefModelToModelScene+0x182: movss [rax+0x208],xmm6 (o campo 0x178 do CM2Model).
++        static const uint8_t kStoreX64[8] = {0xF3, 0x0F, 0x11, 0xB0, 0x08, 0x02, 0x00, 0x00};
++        static const uint8_t kNop8[8] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
++        (void)kStore; (void)kNop6;
++        Toggle(0x791E60, on ? kStoreX64 : kNop8, on ? kNop8 : kStoreX64, 8);
++#else
+         WriteCode(0x791E60, on ? kStore : kNop6, 6);
++#endif
+         const uint32_t flags = on ? 0x100171u : 0x170u;
+         WriteCode(0x605E13, &flags, 4);
+         return 1;
+@@ -135,8 +179,15 @@ namespace
+     int __cdecl OnAutoTarget(void*, const char*, const char* value, void*)   // FUN_10199650
+     {
+         const uint8_t b = IsOne(value) ? 0x75 : 0xEB;
++#if ASC_X64
++        // Packet_Group_29+0x1D7 (o x64 compara o GUID de 64 bits num jne so) e PendingSpellCast::OnSpellStart+0x376.
++        const uint8_t other = IsOne(value) ? 0xEB : 0x75;
++        Toggle(0x75697C, &b, &other, 1);
++        Toggle(0x806AA2, &b, &other, 1);
++#else
+         WriteByte(0x75697C, b);
+         WriteByte(0x806AA2, b);
++#endif
+         return 1;
+     }
+ 
+diff --git a/src/Ascension/AscClientOptions.cpp b/src/Ascension/AscClientOptions.cpp
+index ae23132..a7d77ea 100644
+--- a/src/Ascension/AscClientOptions.cpp
++++ b/src/Ascension/AscClientOptions.cpp
+@@ -286,11 +286,22 @@ namespace
+ #if ASC_X64
+         static const uint8_t kAX64[2] = {0x74, 0x54};   // Spell_C_BeginCast+0x132: test [r14+0x24],0x800; je
+         AscX64::WriteCodeX64(0x80C8C1, on ? kNop2 : kAX64, 2, on ? kAX64 : kNop2);
++        // Spell_C_CastSpell+0x877: test [rsp+0x74],0x800; je (74 08).
++        static const uint8_t kBX64[2] = {0x74, 0x08};
++        AscX64::WriteCodeX64(0x80D7C1, on ? kNop2 : kBX64, 2, on ? kBX64 : kNop2);
++        // Spell_C_BeginCast+0x17E: or dword [rip+..],0x80 (10 bytes, imm em +6). O quirk 0x89 do x86 e mantido; a
++        // 1a escrita parte do stock (0x80), que nao e nenhum dos dois estados.
++        static const uint8_t kCStockX64[10] = {0x81, 0x0D, 0x20, 0xA9, 0x77, 0x00, 0x80, 0x00, 0x00, 0x00};
++        static const uint8_t kCX64[10] = {0x81, 0x0D, 0x20, 0xA9, 0x77, 0x00, 0x89, 0x00, 0x00, 0x00};
++        static const uint8_t kNop10[10] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
++        const uint8_t* cur = static_cast<const uint8_t*>(AscX64::Ptr(0x80C91D));
++        const uint8_t* was = cur && memcmp(cur, kCStockX64, 10) == 0 ? kCStockX64 : (on ? kCX64 : kNop10);
++        AscX64::WriteCodeX64(0x80C91D, on ? kNop10 : kCX64, 10, was);
+ #else
+         PatchBytes(0x80C8C1, on ? kNop2 : kA);
+-#endif
+         PatchBytes(0x80D7C1, on ? kNop2 : kB);
+         PatchBytes(0x80C91D, on ? kNop5 : kC);
++#endif
+         return 1;
+     }
+     // FUN_10a49850: "1" keeps the stock "??" level for dangerous enemies.
+@@ -302,10 +313,13 @@ namespace
+ #if ASC_X64
+         static const uint8_t kAX64[2] = {0x7E, 0x0C};   // Script_UnitLevel+0xF4: jle
+         AscX64::WriteCodeX64(0x60FAB2, on ? kAX64 : kNop2, 2, on ? kNop2 : kAX64);
++        // CGTooltip::SetUnit+0x801: o x64 inverteu o teste (jg 7F 04 -> caminho do IsBossMob); NOP6 do x86 = jmp.
++        static const uint8_t kBX64[2] = {0x7F, 0x04}, kJmpX64[2] = {0xEB, 0x04};
++        AscX64::WriteCodeX64(0x621766, on ? kBX64 : kJmpX64, 2, on ? kJmpX64 : kBX64);
+ #else
+         PatchBytes(0x60FAB2, on ? kA : kNop2);
+-#endif
+         PatchBytes(0x621766, on ? kB : kNop6);
++#endif
+         return 1;
+     }
+     // FUN_10a4a200: frame 4 of the client's list (0x6F75B0) gets the scale clamped to 0..5 at +0x10.
+diff --git a/src/Ascension/AscGlobalsJ.cpp b/src/Ascension/AscGlobalsJ.cpp
+index a7de7e7..44fa7f9 100644
+--- a/src/Ascension/AscGlobalsJ.cpp
++++ b/src/Ascension/AscGlobalsJ.cpp
+@@ -221,9 +221,27 @@ namespace
+             else
+                 WriteCode(address, bytes, n);
+         };
++#if ASC_X64
++        // x64: os mesmos 3 sites com os bytes do WowClient64. UpdateSpellCastBars+0x2D: so o jne do teste de GUID
++        // (o x64 compara o GUID de 64 bits de uma vez); Target+0x1F4 / ClearTarget+0xA7: os calls inteiros.
++        static const uint8_t k720E68X64[6] = {0x0F, 0x85, 0xB7, 0x00, 0x00, 0x00};
++        static const uint8_t k524DC1X64[15] = {0xE8, 0x57, 0x73, 0xD6, 0xFF, 0x8B, 0xD0, 0x48, 0x8B, 0xCF,
++                                               0xE8, 0x2D, 0x68, 0xF0, 0xFF};   // OsGetAsyncTimeMs; UpdateSpellCastBars
++        static const uint8_t k524276X64[8] = {0x48, 0x8B, 0xCB, 0xE8, 0x21, 0xCA, 0xF0, 0xFF};   // StopNamePlateSpellbar
++        static const uint8_t kNops[15] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
++                                          0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
++        auto applyX64 = [&](uint32_t address, const uint8_t* bytes, size_t n) {
++            AscX64::WriteCodeX64(address, on ? kNops : bytes, n, on ? bytes : kNops);
++        };
++        applyX64(0x720E68, k720E68X64, sizeof(k720E68X64));
++        applyX64(0x524DC1, k524DC1X64, sizeof(k524DC1X64));
++        applyX64(0x524276, k524276X64, sizeof(k524276X64));
++        (void)apply;
++#else
+         apply(0x720E68, kSite720E68, sizeof(kSite720E68));
+         apply(0x524DC1, kSite524DC1, sizeof(kSite524DC1));
+         apply(0x524276, kSite524276, sizeof(kSite524276));
++#endif
+         return 0;
+     }
+ 
+@@ -518,6 +536,15 @@ namespace
+     // with the push-immediate at +8 / +0xB patched to 200 around the call.
+     void CallWithPatchedPush(uint32_t fn, uint32_t immediate, lua_State* L)
+     {
++#if ASC_X64
++        // x64: o argumento e um xor ecx,ecx (33 C9) -> mov cl,200 (B1 C8). O resto de ecx (L) fica, mas
++        // CanPerformAction so faz ecx > 0x17 -> default (testa ecx != 0): mesmo efeito do 200.
++        static const uint8_t kXor[2] = {0x33, 0xC9}, kMov200[2] = {0xB1, 0xC8};
++        AscX64::WriteCodeX64(immediate, kMov200, 2, kXor);
++        AscX64::Fn<int (*)(lua_State*)>(fn)(L);
++        AscX64::WriteCodeX64(immediate, kXor, 2, kMov200);
++        return;
++#endif
+         uint8_t v = 200;
+         WriteCode(immediate, &v, 1);
+         reinterpret_cast<int(__cdecl*)(lua_State*)>(fn)(L);
+@@ -596,6 +623,13 @@ namespace
+     void PatchJumps(const uint32_t (&sites)[3], uint8_t stock, bool on)
+     {
+         const uint8_t op = on ? stock : 0xEB;
++#if ASC_X64
++        // x64: os 6 saltos sao jcc curtos com o mesmo opcode (75 / 74) -- so o opcode muda, o deslocamento fica.
++        const uint8_t other = on ? 0xEB : stock;
++        for (uint32_t site : sites)
++            AscX64::WriteCodeX64(site, &op, 1, &other);
++        return;
++#endif
+         for (uint32_t site : sites)
+             WriteCode(site, &op, 1);
+     }
+@@ -1705,8 +1739,14 @@ namespace
+         sDC.AddPacketHandler(0x925, CNetClientCustomPacket((void*)&OnPvPRewardInfo, nullptr));
+         g_74F910Trampoline = AscRuntime::Detour(0x74F910, 8, reinterpret_cast<void*>(&Detour74F910));
+         AscRuntime::ReplaceFunction(0x819730, reinterpret_cast<void*>(&ScriptErrorHandler));
++#if ASC_X64
++        // x64: CGObject_C vtable slot 6 (ShouldFadeout) e um ponteiro de 8 bytes (extra-addr @0x7A8600).
++        const uintptr_t getter = reinterpret_cast<uintptr_t>(&FadeOutGameObjects);
++        AscX64::WriteMem(0x9F3A88, &getter, sizeof(getter), __FUNCTION__);
++#else
+         const uint32_t getter = reinterpret_cast<uint32_t>(&FadeOutGameObjects);
+         WriteCode(0x9F3A88, &getter, 4);
++#endif
+     }
+ 
+     const AscBindings::Binding kBindings[] = {
+diff --git a/src/Ascension/AscGraphics.cpp b/src/Ascension/AscGraphics.cpp
+index c60dbef..dc7deb5 100644
+--- a/src/Ascension/AscGraphics.cpp
++++ b/src/Ascension/AscGraphics.cpp
+@@ -95,6 +95,15 @@ namespace
+     }
+     template <typename T> void PatchValue(uint32_t addr, T v) { Patch(addr, &v, sizeof(T)); }
+     template <size_t N> void PatchBytes(uint32_t addr, const uint8_t (&b)[N]) { Patch(addr, b, N); }
++#if ASC_X64
++    // x64: troca um site entre dois estados com os bytes do WowClient64 (o expect e o outro estado).
++    template <size_t N> void ToggleX64(uint32_t addr, bool first, const uint8_t (&a)[N], const uint8_t (&b)[N])
++    {
++        AscX64::WriteCodeX64(addr, first ? a : b, N, first ? b : a);
++    }
++    // DayNight::g_dnInfo (0xD38B00): os campos de neblina nao tem endereco proprio no x64 -- base + layout.
++    float* DnInfoFloat(uint32_t off64) { return reinterpret_cast<float*>(static_cast<uint8_t*>(ASC_PTR(0xD38B00)) + off64); }
++#endif
+ 
+     const uint8_t* Var(const char* name) { return reinterpret_cast<const uint8_t*>(CVar::Lookup(name)); }
+     float VarF(const uint8_t* v) { return *reinterpret_cast<const float*>(v + ASC_OFF(0x2C, 0x50)); }
+@@ -121,7 +130,13 @@ namespace
+ #else
+         PatchBytes(0x793A45, on ? kOn1 : kOff1);
+ #endif
++#if ASC_X64
++        // 0x7BBA22: o GatherShadowCasters reconstruido nao tem o teste de [0xAEEDD0]&1 -- o x64 ja se comporta
++        // como o estado "off" (NOP); nao ha byte a trocar.
++        (void)kOn2; (void)kOff2;
++#else
+         PatchBytes(0x7BBA22, on ? kOn2 : kOff2);
++#endif
+         return 1;
+     }
+     // FUN_1025d520
+@@ -159,6 +174,17 @@ namespace
+     int __cdecl OnTerrainCulling(void*, const char*, const char* value, void*)
+     {
+         static const uint8_t kOn[] = {0x7B, 0x1C}, kOff[] = {0x90, 0x90};
++#if ASC_X64
++        // CWorldScene::Render+0x275: o x64 inverteu o teste (jbe 76 0E -> CullSortTable); o NOP do jnp = jmp.
++        static const uint8_t kOnX64[2] = {0x76, 0x0E}, kOffX64[2] = {0xEB, 0x0E};
++        (void)kOn; (void)kOff;
++        uint32_t* flags = static_cast<uint32_t*>(ASC_PTR(kTerrainFlags));
++        if (IsOne(value))
++            *flags |= 0x20;
++        else
++            *flags &= ~0x20u;
++        ToggleX64(0x79AA42, IsOne(value), kOnX64, kOffX64);
++#else
+         uint32_t* flags = reinterpret_cast<uint32_t*>(kTerrainFlags);
+         if (IsOne(value))
+         {
+@@ -170,12 +196,25 @@ namespace
+             *flags &= ~0x20u;
+             PatchBytes(0x79AA42, kOff);
+         }
++#endif
+         return 1;
+     }
+     // FUN_102613f0
++#if ASC_X64
++    // CM2Scene::SelectLights+0x166: je 74 0C (so o opcode muda).
++    void Patch81E548(bool stock)
++    {
++        static const uint8_t kJe[1] = {0x74}, kJmp[1] = {0xEB};
++        ToggleX64(0x81E548, stock, kJe, kJmp);
++    }
++#endif
+     int __cdecl OnLightCulling(void*, const char*, const char* value, void*)
+     {
++#if ASC_X64
++        Patch81E548(IsOne(value));
++#else
+         PatchValue<uint8_t>(0x81E548, IsOne(value) ? 0x74 : 0xEB);
++#endif
+         return 1;
+     }
+     // FUN_10263380
+@@ -218,6 +257,24 @@ namespace
+         const double d = atof(value);
+         if (d < 0.001)
+             return 1;
++#if ASC_X64
++        // g_dnInfo.m_fog.m_density (x86 +0x98, x64 +0xB0). Os 5 stores anulados no DayNight::UpdateFog, pelo
++        // fonte: S1 m_fog = override/bands, S4 m_fog = density, S5 interior = density (else), S6/S7 os "* 2" do
++        // fogMode 1. Ficam S2 (grupo/agua) e S3 (lerp interior), como no x86. movss [rip+..],xmm (8 bytes).
++        *DnInfoFloat(0xB0) = static_cast<float>(d);
++        static const uint8_t k7F1777[8] = {0xF3, 0x0F, 0x11, 0x05, 0x39, 0xD6, 0x65, 0x00};   // +0xBF  S1
++        static const uint8_t k7F19F4[8] = {0xF3, 0x0F, 0x11, 0x35, 0x43, 0xD3, 0x65, 0x00};   // +0x3B5 S4
++        static const uint8_t k7F1A49[8] = {0xF3, 0x0F, 0x11, 0x35, 0x21, 0xD3, 0x65, 0x00};   // +0x3EB S5
++        static const uint8_t k7F1A13[8] = {0xF3, 0x0F, 0x11, 0x35, 0xEE, 0xD2, 0x65, 0x00};   // +0x40A S6
++        static const uint8_t k7F1A1B[8] = {0xF3, 0x0F, 0x11, 0x35, 0xFA, 0xD2, 0x65, 0x00};   // +0x412 S7
++        static const uint8_t kNop8[8] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
++        const bool stock = d == 1.0;
++        ToggleX64(0x7F1A13, stock, k7F1A13, kNop8);
++        ToggleX64(0x7F1A49, stock, k7F1A49, kNop8);
++        ToggleX64(0x7F1A1B, stock, k7F1A1B, kNop8);
++        ToggleX64(0x7F1777, stock, k7F1777, kNop8);
++        ToggleX64(0x7F19F4, stock, k7F19F4, kNop8);
++#else
+         PatchValue<float>(0xD38B98, static_cast<float>(d));
+         static const uint8_t kA[] = {0xD9, 0x1D, 0x98, 0x8B, 0xD3, 0x00}, kB[] = {0xD9, 0x15, 0xAC, 0x8B, 0xD3, 0x00},
+                              kC[] = {0xD9, 0x1D, 0xAC, 0x8B, 0xD3, 0x00}, kD[] = {0xD9, 0x15, 0x98, 0x8B, 0xD3, 0x00},
+@@ -228,6 +285,7 @@ namespace
+         PatchBytes(0x7F1A1B, stock ? kC : kNop);
+         PatchBytes(0x7F1777, stock ? kA : kNop);
+         PatchBytes(0x7F19F4, stock ? kD : kNop);
++#endif
+         return 1;
+     }
+     // FUN_10260400: with fogOverride on, the distance clamped to 498..1600 goes to 0xD38C1C; above 498
+@@ -242,13 +300,24 @@ namespace
+         // Azeroth-Ascension: teto 50000 em vez de 1600 -- a neblina do patch-ZZ (LightFloatBand) vai a
+         // 50000 jardas e o addon CoAVista acompanha o farclip.
+         const float d = x <= 50000.0f ? lo : 50000.0f;
++#if ASC_X64
++        *DnInfoFloat(0x140) = d;   // g_dnInfo.m_bands.m_fogEnd (x86 +0x11C)
++#else
+         PatchValue<float>(0xD38C1C, d);
++#endif
+         static const uint8_t kA[] = {0xD9, 0x41, 0x48, 0xD9, 0x58, 0x48}, kB[] = {0xD9, 0x5E, 0x48};
+         static const uint8_t kNop6[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, kNop3[] = {0x90, 0x90, 0x90};
+         const bool fixed = 498.0f < d;
++#if ASC_X64
++        // DayNight::CurrentLight::operator=+0x6D: mov [rcx+0x48],eax (m_fogEnd; o x64 copia o campo como int).
++        static const uint8_t kAX64[3] = {0x89, 0x41, 0x48}, kNop3X64[3] = {0x90, 0x90, 0x90};
++        ToggleX64(0x7ED982, !fixed, kAX64, kNop3X64);
++        (void)kA; (void)kNop6;
++#else
+         PatchBytes(0x7ED982, fixed ? kNop6 : kA);
++#endif
+ #if ASC_X64
+-        // DayNight::LoadLightingBands+0x1F9: movss [rbx+0x48], xmm0 (5 bytes). O par 0x7ED982 continua sem versao x64.
++        // DayNight::LoadLightingBands+0x1F9: movss [rbx+0x48], xmm0 (5 bytes).
+         static const uint8_t kBX64[5] = {0xF3, 0x0F, 0x11, 0x43, 0x48}, kNop5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
+         AscX64::WriteCodeX64(0x7EC15A, fixed ? kNop5 : kBX64, 5, fixed ? kBX64 : kNop5);
+ #else
+@@ -259,7 +328,12 @@ namespace
+     // FUN_1025d130
+     int __cdecl OnAntiportal(void*, const char*, const char* value, void*)
+     {
++#if ASC_X64
++        static const uint8_t kJne[1] = {0x75}, kJmp[1] = {0xEB};   // CMapObjGroup::Create+0x157: jne 75 08
++        ToggleX64(0x7D8444, IsOne(value), kJne, kJmp);
++#else
+         PatchValue<uint8_t>(0x7D8444, IsOne(value) ? 0x75 : 0xEB);
++#endif
+         return 1;
+     }
+     // FUN_102617e0: "1" skips the client's light-count limit.
+@@ -267,7 +341,16 @@ namespace
+     {
+         static const uint8_t kFix[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0xE9, 0xA6, 0x00, 0x00, 0x00};
+         static const uint8_t kStock[] = {0xC7, 0x45, 0xE4, 0x03, 0x00, 0x00, 0x00, 0xEB, 0x02, 0xDD, 0xD8, 0x8B};
++#if ASC_X64
++        // CMapRenderChunk::SetVertexShader+0xB4: o x86 pula o laco dos 3 point lights; no x64 o laco esta
++        // desenrolado -- o 1o call GetPointLight vira jmp para o fim (0x14053FBCB, = o 0x7D0171 do x86), depois que
++        // xmm6/ebp ja foram zerados. CONFERIR em jogo.
++        static const uint8_t kStockX64[5] = {0xE8, 0x77, 0x83, 0xBE, 0xFF}, kFixX64[5] = {0xE9, 0x32, 0x02, 0x00, 0x00};
++        (void)kFix; (void)kStock;
++        ToggleX64(0x7D00BF, IsOne(value), kFixX64, kStockX64);
++#else
+         PatchBytes(0x7D00BF, IsOne(value) ? kFix : kStock);
++#endif
+         return 1;
+     }
+     // Attenuation of a tracked light (sub_1025d020 / FUN_10260f90): linear x 0.7, quadratic x 0.03,
+@@ -283,7 +366,11 @@ namespace
+     // every tracked light is updated. Called before the CVar stores the new value, as in the original.
+     int __cdecl OnLightAttenuation(void*, const char*, const char* value, void*)
+     {
++#if ASC_X64
++        Patch81E548(!(static_cast<float>(atof(value)) != 1.0f));
++#else
+         PatchValue<uint8_t>(0x81E548, static_cast<float>(atof(value)) != 1.0f ? 0xEB : 0x74);
++#endif
+         for (uint8_t* light : g_lights)
+             Attenuate(light);
+         return 1;
+@@ -316,7 +403,14 @@ namespace
+     int __cdecl OnLodObjectCull(void*, const char*, const char* value, void*)
+     {
+         static const uint8_t kOn[] = {0x0F, 0x85, 0xBC, 0x00, 0x00, 0x00}, kOff[] = {0xE9, 0xBD, 0x00, 0x00, 0x00, 0x00};
++#if ASC_X64
++        // CWorldScene::AddDoodadDefModelToModelScene+0xA2: bt eax,0xB; jb (0F 82 A6 00 00 00) -> jmp mesmo alvo.
++        static const uint8_t kOnX64[6] = {0x0F, 0x82, 0xA6, 0x00, 0x00, 0x00}, kOffX64[6] = {0xE9, 0xA7, 0x00, 0x00, 0x00, 0x90};
++        (void)kOn; (void)kOff;
++        ToggleX64(0x791D6A, IsOne(value), kOnX64, kOffX64);
++#else
+         PatchBytes(0x791D6A, IsOne(value) ? kOn : kOff);
++#endif
+         return 1;
+     }
+     // FUN_102622d0: the three mist-density reads point at our float, whatever the value.

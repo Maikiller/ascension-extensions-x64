@@ -1,0 +1,81 @@
+diff --git a/src/Ascension/AscLootLockout.cpp b/src/Ascension/AscLootLockout.cpp
+index 7638e8f..b1e1be7 100644
+--- a/src/Ascension/AscLootLockout.cpp
++++ b/src/Ascension/AscLootLockout.cpp
+@@ -181,7 +181,11 @@ namespace
+         const std::string token = CheckString(L, 1);
+         const int32_t map = ToInt(CheckNumber(L, 2));
+         const int32_t difficulty = ToInt(CheckNumber(L, 3));
++#if ASC_X64
++        const uint32_t max = AscClientDbc::MaxId(kDungeonEncounter);
++#else
+         const uint32_t max = *reinterpret_cast<const uint32_t*>(kDungeonEncounter + 0x0C);
++#endif
+         const uint64_t guid = TokenGuid(token.c_str());
+         AscLua::lua_createtable(L, 0, 0);
+         AscLua::lua_checkstack(L, 2);
+@@ -217,8 +221,12 @@ namespace
+         const int32_t difficulty = ToInt(CheckNumber(L, 3));
+         const uint64_t guid = TokenGuid(token.c_str());
+         bool any = false;
++#if ASC_X64
++        const uint32_t min = AscClientDbc::MinId(kDungeonEncounter), max = AscClientDbc::MaxId(kDungeonEncounter);
++#else
+         const uint32_t min = *reinterpret_cast<const uint32_t*>(kDungeonEncounter + 0x10);
+         const uint32_t max = *reinterpret_cast<const uint32_t*>(kDungeonEncounter + 0x0C);
++#endif
+         for (uint32_t i = min; i < max + 1 && !any; ++i)
+             if (const uint8_t* row = ClientDbcRow(kDungeonEncounter, i))
+                 if (static_cast<int32_t>(U32(row, 4)) == map && static_cast<int32_t>(U32(row, 8)) == difficulty - 1)
+diff --git a/src/Ascension/AscLuaDbc.cpp b/src/Ascension/AscLuaDbc.cpp
+index d76d4f3..7f915e4 100644
+--- a/src/Ascension/AscLuaDbc.cpp
++++ b/src/Ascension/AscLuaDbc.cpp
+@@ -79,7 +79,7 @@ namespace
+         }
+         s->path = "DBFilesClient\\" + name;
+         s->created = true;
+-        *static_cast<Schema**>(lua_newuserdata(L, 4)) = s;
++        *static_cast<Schema**>(lua_newuserdata(L, ASC_OFF(4, 8))) = s;   // um Schema*
+         AscLua::lua_pushstring(L, "LuaDBC");
+         lua_rawget(L, kRegistry);
+         if (AscLua::lua_type(L, -1) == 5)
+diff --git a/src/Ascension/AscTemporalContracts.cpp b/src/Ascension/AscTemporalContracts.cpp
+index 4964ee3..e3f24b4 100644
+--- a/src/Ascension/AscTemporalContracts.cpp
++++ b/src/Ascension/AscTemporalContracts.cpp
+@@ -640,12 +640,20 @@ namespace
+         };
+         if (sort >= 1)
+         {
++#if ASC_X64
++            if (const uint8_t* r = ClientDbcRow(0xAD3134, static_cast<uint32_t>(sort)))   // AreaTable.dbc (container 0xAD3134)
++#else
+             if (const uint8_t* r = row(0xAD3154, 0xAD3144, 0xAD3140, static_cast<uint32_t>(sort)))   // FUN_100b1240
++#endif
+                 text = AscClientDbc::Str(r, 0x2C);
+         }
+         else if (sort < 0)
+         {
++#if ASC_X64
++            if (const uint8_t* r = ClientDbcRow(0xAD4430, static_cast<uint32_t>(-sort)))   // container 0xAD4430
++#else
+             if (const uint8_t* r = row(0xAD4450, 0xAD4440, 0xAD443C, static_cast<uint32_t>(-sort)))   // FUN_100b1ea0
++#endif
+                 text = AscClientDbc::Str(r, 4);
+         }
+         AscLua::lua_pushstring(L, text);
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -54,6 +54,10 @@
+         // lote 5 (30/10, projects-2c) g1 -- chamados ao entrar no mundo. SpellApi/CAMgr: limites de DBC via
+         // AscClientDbc; MysticEnchant: ItemStats_C m_buyPrice +0x24; Tutorial: CVar int +0x54.
+         "AscSpellApi", "AscTutorial", "AscMysticEnchant", "AscCAMgr",
++        // lote 5 g2: LootLockout/TemporalContracts (limites e linhas de DBC via AscClientDbc), LuaDbc (userdata 8
++        // bytes); BuildCreator (z_stream natural x64), WildcardRolls e VanityCollection conferidos sem mudanca.
++        "AscBuildCreator", "AscWildcardRolls", "AscTemporalContracts", "AscVanityCollection", "AscLootLockout",
++        "AscLuaDbc",
+         nullptr };
+ }
+ 

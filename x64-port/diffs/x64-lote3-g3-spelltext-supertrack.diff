@@ -1,0 +1,111 @@
+diff --git a/src/Ascension/AscSpellText.cpp b/src/Ascension/AscSpellText.cpp
+index 363bba0..ffd164c 100644
+--- a/src/Ascension/AscSpellText.cpp
++++ b/src/Ascension/AscSpellText.cpp
+@@ -13,6 +13,7 @@
+ #include <Ascension/AscSpellText.hpp>
+ #include <Ascension/AscX64.hpp>
+ #include <Ascension/AscBindings.hpp>
++#include <Ascension/AscClientDbc.hpp>
+ #include <Ascension/AscCAMgr.hpp>
+ #include <Ascension/AscClientOptions.hpp>
+ #include <Ascension/AscGameMode.hpp>
+@@ -60,8 +61,13 @@ namespace
+         std::string out;
+         if ((RecU32(rec, 0x18) >> 19) & 1 || (RecU32(rec, 0x30) == 0 && RecU32(rec, 0x34) == 0))
+             return out;
++#if ASC_X64
++        const uint32_t lo = AscClientDbc::MinId(kShapeshiftForms), hi = AscClientDbc::MaxId(kShapeshiftForms);
++        for (uint32_t form = lo; form <= hi; ++form)
++#else
+         const uint32_t lo = *reinterpret_cast<const uint32_t*>(kShapeshiftForms + 0x10);
+         for (uint32_t form = lo; form <= *reinterpret_cast<const uint32_t*>(kShapeshiftForms + 0x0C); ++form)
++#endif
+         {
+             if (form == 0 || (form - 1) >> 5 >= 2)
+                 continue;
+@@ -668,7 +674,15 @@ std::string Description(uint32_t spellId, bool a, bool cached, int c)
+             }
+     if (!hit)
+     {
++#if ASC_X64
++        // SpellParserParseText le o SpellRec do cliente (layout x64), nao a copia 12340 de FetchSpell.
++        const uint8_t* native = static_cast<const uint8_t*>(AscClientDbc::Native(0xAD49D0, spellId));   // Spell.dbc
++        if (!native)
++            return std::string();
++        FormatSpell(native, buffer, sizeof(buffer), 0, 0, 0, 0, 1, 0);
++#else
+         FormatSpell(rec, buffer, sizeof(buffer), 0, 0, 0, 0, 1, 0);
++#endif
+         FormattedEntry f;
+         f.spell = spellId;
+         memcpy(f.text, buffer, sizeof(buffer));
+diff --git a/src/Ascension/AscSuperTrack.cpp b/src/Ascension/AscSuperTrack.cpp
+index accc06e..8750e41 100644
+--- a/src/Ascension/AscSuperTrack.cpp
++++ b/src/Ascension/AscSuperTrack.cpp
+@@ -173,6 +173,31 @@ namespace
+     // objective index and +4 / +0xC set. Returns the query's last dword.
+     uint32_t ObjectiveQuery(uint32_t quest, uint32_t objective)
+     {
++#if ASC_X64
++        // QuestLogLeaderBoardParams no layout x64 (4 callbacks de 8 bytes; m_complete em +0x1078).
++        struct Params
++        {
++            int32_t index, requireLogEntry, countEmpty, showProgress;
++            void* callbacks[4];
++            void* param;
++            char text[4096];
++            char type[64];
++            int32_t complete;
++        };
++        static_assert(offsetof(Params, complete) == 0x1078, "QuestLogLeaderBoardParams x64");
++        static Params s_params;   // 4 KB; so a thread principal chama (timers / Lua)
++        Params* lb = &s_params;
++        *lb = Params{};
++        lb->index = static_cast<int32_t>(objective);
++        lb->requireLogEntry = 1;
++        lb->showProgress = 1;
++        lb->callbacks[0] = ASC_PTR(0x5DE930);
++        lb->callbacks[1] = ASC_PTR(0x5DEA10);
++        lb->callbacks[2] = ASC_PTR(0x5DE9E0);
++        lb->callbacks[3] = ASC_PTR(0x5DEA40);
++        reinterpret_cast<void(__cdecl*)(uint32_t, Params*)>(ASC_PTR(0x5E1460))(quest, lb);
++        return static_cast<uint32_t>(lb->complete);
++#endif
+         std::vector<uint32_t> q(0x41A, 0);
+         q[0] = objective;
+         q[1] = 1;
+@@ -421,8 +446,17 @@ namespace
+             0x83, 0xC4, 0x04};
+         *reinterpret_cast<uint8_t*>(ASC_PTR(0xD3F798)) = on ? 0 : 1;
+ #if ASC_X64
+-        // TODO x64: NOPs nas chamadas de 0x49DDBF/0x49DDE5 sao bytes x86 -- precisa versao x64 (midpatch-x64.md)
+-        AscLog::Printf("x64: SuperTrack patch de codigo 0x49DDBF/0x49DDE5 ignorado");
++        // Script_SetPoint+0x2E7 / +0x316: x e y passam crus -- call CoordinateGetAspectCompensation; mulss;
++        // divss; movaps xmm0,xmm6; call NDCToDDCWidth (25 bytes cada) -> movaps xmm0,xmm6 + NOPs.
++        static const uint8_t kStockX[25] = {0xE8, 0x14, 0xB0, 0xF8, 0xFF, 0xF3, 0x0F, 0x59, 0x05, 0x00, 0x00, 0x6C, 0x00,
++            0xF3, 0x0F, 0x5E, 0xF0, 0x0F, 0x28, 0xC6, 0xE8, 0x30, 0xB1, 0xF8, 0xFF};
++        static const uint8_t kStockY[25] = {0xE8, 0xE5, 0xAF, 0xF8, 0xFF, 0xF3, 0x0F, 0x59, 0x05, 0xD1, 0xFF, 0x6B, 0x00,
++            0xF3, 0x0F, 0x5E, 0xF0, 0x0F, 0x28, 0xC6, 0xE8, 0x01, 0xB1, 0xF8, 0xFF};
++        static const uint8_t kRaw[25] = {0x0F, 0x28, 0xC6, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
++            0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
++        (void)stockA; (void)stockB;
++        AscX64::WriteCodeX64(0x49DDBF, on ? kRaw : kStockX, 25, on ? kStockX : kRaw);
++        AscX64::WriteCodeX64(0x49DDE5, on ? kRaw : kStockY, 25, on ? kStockY : kRaw);
+         return 0;
+ #endif
+         if (on)
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -48,6 +48,9 @@
+         "AscWorldMap", "AscAssetQuery", "AscCanToggle",
+         // g2: pacotes custom/Lua (CDataStore x64 conferido; CVar m_key +0x28, m_stringValue +0x48, int +0x54).
+         "AscPacketApi", "AscHotPatch", "AscEventPackets", "AscRaidVideo",
++        // g3: SpellText (SpellParserParseText com o SpellRec nativo), SuperTrack (LeaderBoardParams x64 +
++        // Script_SetPoint x64). Os CVars de mundo deles dependem do detour 0x51D9B0 do AscClientOptions.
++        "AscSpellText", "AscSuperTrack",
+         nullptr };
+ }
+ 

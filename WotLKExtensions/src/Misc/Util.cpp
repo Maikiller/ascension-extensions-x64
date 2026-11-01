@@ -1,0 +1,61 @@
+#include <Misc/Util.hpp>
+#include <Ascension/AscX64.hpp>
+
+#include <algorithm>
+#include <cctype>
+
+void Util::SetByteAtAddress(void* address, uint8_t byte)
+{
+    DWORD flOldProtect = 0;
+
+    VirtualProtect(address, 0x1, PAGE_EXECUTE_READWRITE, &flOldProtect);
+    *reinterpret_cast<uint8_t*>(address) = byte;
+    VirtualProtect(address, 0x1, flOldProtect, &flOldProtect);
+}
+
+void Util::OverwriteBytesAtAddress(void* address, uint8_t byte, size_t numRepeats)
+{
+    DWORD flOldProtect = 0;
+
+    VirtualProtect(address, numRepeats, PAGE_EXECUTE_READWRITE, &flOldProtect);
+    memset(address, byte, numRepeats);
+    VirtualProtect(address, numRepeats, flOldProtect, &flOldProtect);
+}
+
+void Util::OverwriteBytesAtAddress(uint32_t address, uint8_t byteArray[], size_t arraySize)
+{
+#if ASC_X64
+    AscX64::WriteMem(address, byteArray, arraySize, __FUNCTION__);
+    return;
+#endif
+    for (size_t i = 0; i < arraySize; i++)
+        SetByteAtAddress(reinterpret_cast<void*>(address + i), byteArray[i]);
+}
+
+void Util::OverwriteUInt32AtAddress(uint32_t address, uint32_t newVal)
+{
+#if ASC_X64
+    AscX64::WriteMem(address, &newVal, sizeof(newVal), __FUNCTION__);
+    return;
+#endif
+    DWORD flOldProtect = 0;
+    void* vAddress = reinterpret_cast<void*>(address);
+
+    VirtualProtect(vAddress, sizeof(uint32_t), PAGE_EXECUTE_READWRITE, &flOldProtect);
+    *reinterpret_cast<uint32_t*>(address) = newVal;
+    VirtualProtect(vAddress, sizeof(uint32_t), flOldProtect, &flOldProtect);
+}
+
+void Util::PercToScreenPos(float x, float y, float* resX, float* resY)
+{
+    float g_UITexCoordAlphaMultiplier1 = *reinterpret_cast<float*>(ASC_PTR(0xAC0CB4));
+    float g_UITexCoordAlphaMultiplier3 = *reinterpret_cast<float*>(ASC_PTR(0xAC0CBC));
+
+    *resX = (x * (g_UITexCoordAlphaMultiplier3 * 1024.f)) / g_UITexCoordAlphaMultiplier1;
+    *resY = (y * (g_UITexCoordAlphaMultiplier3 * 1024.f)) / g_UITexCoordAlphaMultiplier1;
+}
+
+void Util::StringToLower(std::string& string)
+{
+    std::transform(string.begin(), string.end(), string.begin(), [](unsigned char c) { return std::tolower(c); });
+}

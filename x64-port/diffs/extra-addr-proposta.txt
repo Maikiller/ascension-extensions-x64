@@ -1,0 +1,33 @@
+0x4CFD20 WowClientDB_RLE<SpellRec>::GetRecord
+0x50D641 Script_SendChatMessage +0x48A
+0x52B27A CGGameUI::Idle +0x3F7
+0x55F4D0 TSHashTable<UIADDON,HASHKEY_STRI>::Ptr
+0x59714D CGCharacterModelBase::RotateModel +0x69
+0x5971C1 CGCharacterModelBase::UpdateModel +0x15
+0x5A8C70 CGActionBar::GetSpell +0x56
+0x5B01C8 CGCurrencyTypes::BuildDisplayList +0x1DD
+0x60FAB2 Script_UnitLevel +0xF4
+0x67CA30 DBCache<ItemStats_C,int,HASHKEY_INT>::GetRecord
+0x67D770 DBCache<NameCache,unsigned __int64,CHashKeyGUID>::GetRecord
+0x67DE90 DBCache<QuestCache,int,HASHKEY_INT>::GetRecord
+0x67EF70 DBCache<CGPetition,int,HASHKEY_INT>::GetRecord
+0x715586 CGUnit_C::ObjectNameVisibilityChanged +0x2B
+0x7370AF CGUnit_C::SetSheatheState +0x1AD
+0x792AF2 CWorldScene::AddMapObjDefGroup +0x24
+0x792AFF CWorldScene::AddMapObjDefGroup +0x31
+0x793115 CWorldScene::CullEntitys +0x94
+0x793126 CWorldScene::CullEntitys +0xA5
+0x79313F CWorldScene::CullEntitys +0xBE
+0x7AD2EE CMapObj::RenderInterior +0x153
+0x7EC15A DayNight::LoadLightingBands +0x1F9
+0x80D6EF Spell_C_CastSpell +0x7D0
+0x989B97 CMovementShared::SetRawFacing +0x31
+0x991050 FT_Get_Kerning
+0x9911A0 FT_Get_Char_Index
+0x991320 FT_New_Library
+0x992610 FT_Done_Face
+0x992780 FT_Set_Pixel_Sizes
+0x992B60 FT_Render_Glyph
+0x992CB0 FT_Done_Library
+0x992DA0 FT_Load_Glyph
+0x993370 FT_New_Memory_Face

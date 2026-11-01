@@ -1,0 +1,1841 @@
+diff --git a/src/Ascension/AscAlternatePower.cpp b/src/Ascension/AscAlternatePower.cpp
+index efbb0be..9d3b680 100644
+--- a/src/Ascension/AscAlternatePower.cpp
++++ b/src/Ascension/AscAlternatePower.cpp
+@@ -24,7 +24,7 @@
+ 
+ namespace
+ {
+-    uint64_t GuidOf(void* object) { return **reinterpret_cast<const uint64_t* const*>(static_cast<uint8_t*>(object) + 8); }
++    uint64_t GuidOf(void* object) { return **reinterpret_cast<const uint64_t* const*>(static_cast<uint8_t*>(object) + ASC_OFF(8, 0x10)); }
+ 
+     // LAB_10321bb0
+     void __cdecl AlternatePowerChanged(uint32_t lo, uint32_t hi, uint32_t, void*, AscObjectAddon::Field*)
+@@ -51,7 +51,7 @@ namespace
+         uint8_t* unit = static_cast<uint8_t*>(AscScript::ObjectPtr(AscX64::Guid(lo, hi), 8));
+         if (!unit)
+             return;
+-        uint32_t* health = reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(unit + 8) + 0x60);
++        uint32_t* health = reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(unit + ASC_OFF(8, 0x10)) + 0x60);
+         if (*health == 0)
+             return;
+         *health = 0;
+@@ -96,10 +96,10 @@ namespace
+         }
+         if (!AscScript::FetchSpell(g_jumpSpell, rec))
+             return;
+-        const uint8_t* movement = *reinterpret_cast<uint8_t* const*>(player + 0xD8);
+-        if (!movement || !(*reinterpret_cast<const uint32_t*>(movement + 0x44) & 0x1000))
++        const uint8_t* movement = *reinterpret_cast<uint8_t* const*>(player + ASC_OFF(0xD8, 0x170));
++        if (!movement || !(*reinterpret_cast<const uint32_t*>(movement + ASC_OFF(0x44, 0x5C)) & 0x1000))
+             return;
+-        const uint32_t* guid = *reinterpret_cast<uint32_t* const*>(player + 8);
++        const uint32_t* guid = *reinterpret_cast<uint32_t* const*>(player + ASC_OFF(8, 0x10));
+         #if ASC_X64
+         reinterpret_cast<bool (*)(int32_t, const void*, uint64_t, bool)>(ASC_PTR(0x80DA40))(g_jumpSpell, nullptr, AscX64::Guid(guid[0], guid[1]), false);
+ #else
+diff --git a/src/Ascension/AscAppearance.cpp b/src/Ascension/AscAppearance.cpp
+index 1ef6b4f..bcd6aba 100644
+--- a/src/Ascension/AscAppearance.cpp
++++ b/src/Ascension/AscAppearance.cpp
+@@ -593,10 +593,10 @@ namespace
+     // The player's class (UNIT_FIELD_BYTES_0 byte 1), 0 unless the object is a unit/player (+0x14 3 / 4).
+     uint32_t PlayerClass(uint8_t* player)
+     {
+-        const uint32_t type = *reinterpret_cast<const uint32_t*>(player + 0x14);
++        const uint32_t type = *reinterpret_cast<const uint32_t*>(player + ASC_OFF(0x14, 0x24));
+         if (type != 3 && type != 4)
+             return 0;
+-        return (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(player + 8) + 0x5C) >> 8) & 0xFF;
++        return (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(player + ASC_OFF(8, 0x10)) + 0x5C) >> 8) & 0xFF;
+     }
+     bool StockClass(uint8_t* player)   // FUN_100c6380
+     {
+@@ -1666,7 +1666,7 @@ namespace
+             PushBool(L, false);
+             return 1;
+         }
+-        const uint64_t itemGuid = *reinterpret_cast<const uint64_t*>(*reinterpret_cast<uint8_t* const*>(item + 8));
++        const uint64_t itemGuid = *reinterpret_cast<const uint64_t*>(*reinterpret_cast<uint8_t* const*>(item + ASC_OFF(8, 0x10)));
+         Packet(0x6EA).Data(&itemGuid, 8).Send();
+         PushBool(L, true);
+         return 1;
+diff --git a/src/Ascension/AscAttachFixes.cpp b/src/Ascension/AscAttachFixes.cpp
+index 04c9200..84977f5 100644
+--- a/src/Ascension/AscAttachFixes.cpp
++++ b/src/Ascension/AscAttachFixes.cpp
+@@ -221,7 +221,7 @@ namespace
+     int __cdecl Detour730050(uintptr_t a, uint32_t b, uint32_t c, uintptr_t d, uintptr_t e)
+     {
+         const uint8_t* rec = static_cast<const uint8_t*>(AscScript::ObjectPtr(AscX64::Guid(a, b), 0xFFFF));
+-        if (*reinterpret_cast<const uint32_t*>(rec + 0x14) == 3)
++        if (*reinterpret_cast<const uint32_t*>(rec + ASC_OFF(0x14, 0x24)) == 3)
+             g_allow6F9260 = 0;
+         return g_730050(a, b, c, d, e);
+     }
+@@ -283,9 +283,9 @@ namespace
+     {
+         const uint8_t* object = static_cast<const uint8_t*>(ecx);
+         g_fadeFlag = 1;
+-        if (*reinterpret_cast<const uint32_t*>(object + 0x14) == 6)
++        if (*reinterpret_cast<const uint32_t*>(object + ASC_OFF(0x14, 0x24)) == 6)
+         {
+-            const uint8_t* fields = *reinterpret_cast<const uint8_t* const*>(object + 8);
++            const uint8_t* fields = *reinterpret_cast<const uint8_t* const*>(object + ASC_OFF(8, 0x10));
+             if (*reinterpret_cast<const uint32_t*>(fields + 0x24) == 0x16C7A)
+                 g_fadeFlag = 0;
+         }
+@@ -446,7 +446,7 @@ namespace
+     Fn620EE0_t g_620EE0 = nullptr;
+     int __fastcall Detour620EE0(void* ecx ASC_EDX_P(void* edx), uint8_t* unit, uintptr_t b, uint32_t c)
+     {
+-        uint8_t* fields = *reinterpret_cast<uint8_t**>(unit + 8);
++        uint8_t* fields = *reinterpret_cast<uint8_t**>(unit + ASC_OFF(8, 0x10));
+         uint64_t guid;
+         memcpy(&guid, fields, 8);
+         const uint32_t saved = *reinterpret_cast<uint32_t*>(fields + 0xD8);
+@@ -465,11 +465,11 @@ namespace
+         if (r == 0)
+             return r;
+         uint8_t* object = static_cast<uint8_t*>(ecx);
+-        uint32_t& cached = *reinterpret_cast<uint32_t*>(object + 0xB0);
++        uintptr_t& cached = *reinterpret_cast<uintptr_t*>(object + ASC_OFF(0xB0, 0x130));
+         if (cached == 0)
+         {
+-            const uint64_t guid = **reinterpret_cast<const uint64_t* const*>(object + 8);
+-            cached = reinterpret_cast<uint32_t(__cdecl*)(const uint64_t*)>(ASC_PTR(0x7E5FD0))(&guid);
++            const uint64_t guid = **reinterpret_cast<const uint64_t* const*>(object + ASC_OFF(8, 0x10));
++            cached = reinterpret_cast<uintptr_t(__cdecl*)(const uint64_t*)>(ASC_PTR(0x7E5FD0))(&guid);
+         }
+         reinterpret_cast<void(__cdecl*)(uintptr_t)>(ASC_PTR(0x7E6390))(cached);
+         return r;
+@@ -481,7 +481,7 @@ namespace
+     int __fastcall Detour718A00(void* ecx ASC_EDX_P(void* edx))
+     {
+         const int r = g_718A00(ecx ASC_EDX_A(edx));
+-        if (*reinterpret_cast<const uint32_t*>(static_cast<uint8_t*>(ecx) + 0x14) != 3 || !AscChallenge::ActiveHasRule(0x6D))
++        if (*reinterpret_cast<const uint32_t*>(static_cast<uint8_t*>(ecx) + ASC_OFF(0x14, 0x24)) != 3 || !AscChallenge::ActiveHasRule(0x6D))
+             return r;
+         if (r == 0 || r == 5)
+             return 1;
+@@ -773,7 +773,7 @@ namespace
+         std::string text(name);
+         if (text.size() < 3 || text.find("$CN") == std::string::npos)
+             return name;
+-        const uint8_t* fields = *reinterpret_cast<const uint8_t* const*>(static_cast<uint8_t*>(ecx) + 8);
++        const uint8_t* fields = *reinterpret_cast<const uint8_t* const*>(static_cast<uint8_t*>(ecx) + ASC_OFF(8, 0x10));
+         uint32_t guid[2] = {*reinterpret_cast<const uint32_t*>(fields + 0x18), *reinterpret_cast<const uint32_t*>(fields + 0x1C)};
+         const char* owner = reinterpret_cast<const char*(__cdecl*)(uint32_t*)>(ASC_PTR(0x74D750))(guid);
+         if (!owner)
+@@ -802,12 +802,12 @@ namespace
+         const uint8_t* item = static_cast<const uint8_t*>(AscScript::ObjectPtr(AscX64::Guid(guid[0], guid[1]), 2));
+         if (!item)
+             return 0;
+-        const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(item + 8) + 0xC);
++        const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(item + ASC_OFF(8, 0x10)) + 0xC);
+         const uint8_t* tmpl = static_cast<const uint8_t*>(reinterpret_cast<void*(__thiscall*)(void*, uint32_t, void*, void*, void*, int)>(ASC_PTR(0x67CA30))(
+             reinterpret_cast<void*>(ASC_PTR(0xC5D828)), entry, nullptr, nullptr, nullptr, 0));
+         if (!tmpl)
+             return 0;
+-        if (*reinterpret_cast<const uint32_t*>(tmpl + 0x14) == 6 || (minutes != 720 && minutes != 1440 && minutes != 2880))
++        if (*reinterpret_cast<const uint32_t*>(tmpl + ASC_OFF(0x14, 0x18)) == 6 || (minutes != 720 && minutes != 1440 && minutes != 2880))
+             return 1;
+         float deposit = static_cast<float>(static_cast<double>(price)) * static_cast<float>(static_cast<double>(count)) / 100.0f *
+                         static_cast<float>(static_cast<double>(minutes)) * 0.004166667f;
+@@ -825,13 +825,13 @@ namespace
+     {
+         typedef const uint8_t*(__cdecl* Obj_t)(uint32_t, uint32_t, uint32_t);
+         const Obj_t obj = [](uint32_t lo, uint32_t hi, uint32_t m) -> const uint8_t* { return static_cast<const uint8_t*>(AscScript::ObjectPtr(AscX64::Guid(lo, hi), m)); };   // 0x4D4DB0 (x64: WOWGUID + arquivo/linha)
+-        const uint8_t* fields = *reinterpret_cast<const uint8_t* const*>(player + 8);
++        const uint8_t* fields = *reinterpret_cast<const uint8_t* const*>(player + ASC_OFF(8, 0x10));
+         int32_t n = 0;
+         for (uint32_t i = 0x17; i != 0x27; ++i)
+         {
+             const uint8_t* it = obj(*reinterpret_cast<const uint32_t*>(fields + 0x510 + i * 8), *reinterpret_cast<const uint32_t*>(fields + 0x514 + i * 8), 2);
+-            if (it && *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(it + 8) + 0xC) == item)
+-                n += *reinterpret_cast<const int32_t*>(*reinterpret_cast<const uint8_t* const*>(it + 8) + 0x38);
++            if (it && *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0xC) == item)
++                n += *reinterpret_cast<const int32_t*>(*reinterpret_cast<const uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0x38);
+         }
+         const uint8_t* bags = reinterpret_cast<const uint8_t*>(ASC_PTR(0xC23540));
+         for (uint32_t i = 0x13; i != 0x17; ++i)
+@@ -843,12 +843,12 @@ namespace
+             void* inv = reinterpret_cast<void*(__thiscall*)(void*)>(vt[0x24 / 4])(bag);   // the slot list 0x754390 reads
+             if (!inv)
+                 continue;
+-            const uint32_t slots = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(bag + 8) + 0x100);
++            const uint32_t slots = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(bag + ASC_OFF(8, 0x10)) + 0x100);
+             for (uint32_t k = 0; k < slots; ++k)
+             {
+                 const uint8_t* it = reinterpret_cast<const uint8_t*(__thiscall*)(void*, uint32_t)>(ASC_PTR(0x754390))(inv, k);
+-                if (it && *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(it + 8) + 0xC) == item)
+-                    n += *reinterpret_cast<const int32_t*>(*reinterpret_cast<const uint8_t* const*>(it + 8) + 0x38);
++                if (it && *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0xC) == item)
++                    n += *reinterpret_cast<const int32_t*>(*reinterpret_cast<const uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0x38);
+             }
+         }
+         return n;
+@@ -861,7 +861,7 @@ namespace
+         const uint8_t* tmpl = reinterpret_cast<Get_t>(cacheGet)(cache, entry, nullptr, nullptr, nullptr, 0);
+         if (!tmpl)
+             return false;
+-        const uint8_t* fields = *reinterpret_cast<const uint8_t* const*>(player + 8);
++        const uint8_t* fields = *reinterpret_cast<const uint8_t* const*>(player + ASC_OFF(8, 0x10));
+         const uint32_t logCount = *reinterpret_cast<const uint32_t*>(ASC_PTR(0xC23AD0));
+         for (uint32_t e = 0; e < logCount; ++e)
+         {
+@@ -920,9 +920,9 @@ namespace
+     int __fastcall Detour743530(void* ecx ASC_EDX_P(void* edx), uint32_t a)
+     {
+         const uint8_t* object = static_cast<const uint8_t*>(ecx);
+-        if (*reinterpret_cast<const uint32_t*>(object + 0x14) == 5 && CVarInt(g_goVar) == 1)
++        if (*reinterpret_cast<const uint32_t*>(object + ASC_OFF(0x14, 0x24)) == 5 && CVarInt(g_goVar) == 1)
+         {
+-            const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(object + 8) + 0xC);
++            const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(object + ASC_OFF(8, 0x10)) + 0xC);
+             const uint8_t* player = ActivePlayer();
+             if (player && QuestRelevant(player, entry, reinterpret_cast<void*>(ASC_PTR(0xC5D718)), 0x67BD40, 0x78))
+                 return 1;
+@@ -939,12 +939,12 @@ namespace
+         if (r == 0)
+             return 0;
+         uint8_t* unit = static_cast<uint8_t*>(ecx);
+-        if (*reinterpret_cast<const uint32_t*>(unit + 0x14) != 3)
++        if (*reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x14, 0x24)) != 3)
+             return r;
+         if (reinterpret_cast<int(__thiscall*)(void*, uint32_t)>(ASC_PTR(0x7282A0))(unit, 0x214466))
+         {
+             const uint32_t* target = reinterpret_cast<const uint32_t*>(ASC_PTR(0xBD07B0));
+-            const uint32_t* guid = *reinterpret_cast<const uint32_t* const*>(unit + 8);
++            const uint32_t* guid = *reinterpret_cast<const uint32_t* const*>(unit + ASC_OFF(8, 0x10));
+             if (target[0] != guid[0] || target[1] != guid[1])
+                 return 0;
+         }
+@@ -953,10 +953,10 @@ namespace
+             return 1;
+         if (CVarInt(g_questVar) == 1)
+         {
+-            const uint32_t reaction = *reinterpret_cast<const uint32_t*>(unit + 0x90);
++            const uint32_t reaction = *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x90, 0x108));
+             if (reaction != 0 && reaction != 1)
+                 return 1;
+-            const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(unit + 8) + 0xC);
++            const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0xC);
+             const uint8_t* player = ActivePlayer();
+             if (player && QuestRelevant(player, entry, reinterpret_cast<void*>(ASC_PTR(0xC5D690)), 0x67B6A0, 0x40))
+                 return 1;
+diff --git a/src/Ascension/AscAuraAmounts.cpp b/src/Ascension/AscAuraAmounts.cpp
+index b44f4ae..cb56af0 100644
+--- a/src/Ascension/AscAuraAmounts.cpp
++++ b/src/Ascension/AscAuraAmounts.cpp
+@@ -183,7 +183,7 @@ namespace
+             PushInt(L, 0);
+             return 1;
+         }
+-        const uint64_t guid = **reinterpret_cast<uint64_t**>(player + 8);
++        const uint64_t guid = **reinterpret_cast<uint64_t**>(player + ASC_OFF(8, 0x10));
+         auto node = g_units.find(guid);
+         int32_t sum = 0;
+         typedef uint32_t(__thiscall* Count_t)(void*);
+@@ -229,7 +229,7 @@ namespace
+     // FUN_10a10630 (object free, list 0x10BE2BEC): the freed object's GUID erased from the map.
+     void ForgetObject(void* object)
+     {
+-        g_units.erase(*reinterpret_cast<const uint64_t*>(*reinterpret_cast<const uint8_t* const*>(static_cast<uint8_t*>(object) + 8)));
++        g_units.erase(*reinterpret_cast<const uint64_t*>(*reinterpret_cast<const uint8_t* const*>(static_cast<uint8_t*>(object) + ASC_OFF(8, 0x10))));
+     }
+ 
+     void Init()
+diff --git a/src/Ascension/AscBindings.cpp b/src/Ascension/AscBindings.cpp
+index c7abc52..6e9aaf0 100644
+--- a/src/Ascension/AscBindings.cpp
++++ b/src/Ascension/AscBindings.cpp
+@@ -178,7 +178,7 @@ namespace
+         uint8_t* player = reinterpret_cast<uint8_t*(__cdecl*)()>(ASC_PTR(0x4038F0))();
+         if (!player)
+             return 0;
+-        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + ASC_OFF(8, 0x10));
+         ClientsideAuraOn(L, *reinterpret_cast<const uint64_t*>(desc + 0x48), kNoCaster);
+         return 0;
+     }
+@@ -398,7 +398,7 @@ namespace
+         const uint8_t* player = static_cast<const uint8_t*>(ObjectPtr(guid, 0x10));
+         if (!player)
+             return nullptr;
+-        flags = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(player + 8) + 600);
++        flags = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 600);
+         return player;
+     }
+ 
+diff --git a/src/Ascension/AscBuildCreator.cpp b/src/Ascension/AscBuildCreator.cpp
+index 992c243..22f997e 100644
+--- a/src/Ascension/AscBuildCreator.cpp
++++ b/src/Ascension/AscBuildCreator.cpp
+@@ -188,10 +188,10 @@ namespace
+         const uint8_t* unit = ActivePlayer();
+         if (!unit)
+             return 0;
+-        const uint32_t type = *reinterpret_cast<const uint32_t*>(unit + 0x14);
++        const uint32_t type = *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x14, 0x24));
+         if (type != 3 && type != 4)
+             return 0;
+-        return (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0x5C) >> 8) & 0xFF;
++        return (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0x5C) >> 8) & 0xFF;
+     }
+ 
+     bool StockClass(uint32_t c) { return (c >= 1 && c <= 9) || c == 11; }   // FUN_100c6380
+@@ -843,7 +843,7 @@ namespace
+             if (player)
+             {
+                 // CGObject vtable +0xD8: the object's name.
+-                auto fn = *reinterpret_cast<const char*(__thiscall**)(void*)>(*reinterpret_cast<uint8_t**>(player) + 0xD8);
++                auto fn = *reinterpret_cast<const char*(__thiscall**)(void*)>(*reinterpret_cast<uint8_t**>(player) + ASC_OFF(0xD8, 0x1B0));
+                 n = fn(player);
+                 if (!n)
+                     n = "";
+diff --git a/src/Ascension/AscCAFilter.cpp b/src/Ascension/AscCAFilter.cpp
+index 1ba39c8..8152b64 100644
+--- a/src/Ascension/AscCAFilter.cpp
++++ b/src/Ascension/AscCAFilter.cpp
+@@ -255,7 +255,7 @@ namespace
+             const uint8_t* unit = ActivePlayerUnit();
+             if (!unit)
+                 return false;
+-            const uint32_t level = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(unit + 8) + 0xD8);
++            const uint32_t level = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0xD8);
+             return AscCA::ModeRequiredLevel(r) <= level + 2;
+         }
+         case 0x3B:   // FILTER_WCR_TRAITS: every non-trait; a trait only when a stock class knows it
+diff --git a/src/Ascension/AscCAMgr.cpp b/src/Ascension/AscCAMgr.cpp
+index e09737a..af3ad79 100644
+--- a/src/Ascension/AscCAMgr.cpp
++++ b/src/Ascension/AscCAMgr.cpp
+@@ -82,10 +82,10 @@ namespace
+     // (descriptor +0x5C) and its level UNIT_FIELD_LEVEL (descriptor +0xD8).
+     uint8_t UnitClass(const uint8_t* unit)
+     {
+-        const uint32_t type = *reinterpret_cast<const uint32_t*>(unit + 0x14);
++        const uint32_t type = *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x14, 0x24));
+         if (type != 3 && type != 4)
+             return 0;
+-        return static_cast<uint8_t>(*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0x5C) >> 8);
++        return static_cast<uint8_t>(*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0x5C) >> 8);
+     }
+ 
+     // ---- row predicates ---------------------------------------------------------------------------
+@@ -1242,7 +1242,7 @@ namespace
+     // FUN_1014e4d0: the build parameters a unit implies, as FUN_10158810 compares and copies them.
+     void ParamsFromUnit(Build& out, const uint8_t* unit, int32_t spec)
+     {
+-        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(unit + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+         out.guid = *reinterpret_cast<const uint64_t*>(desc);
+         out.spec = spec;
+         const uint8_t cls = UnitClass(unit);
+@@ -3551,7 +3551,7 @@ namespace
+ 
+     bool WildcardMode() { return (AscGameMode::Mode() >> 6) & 1; }   // FUN_1031ef10 bit 6
+ 
+-    uint32_t Coinage(const uint8_t* unit) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0x1248); }
++    uint32_t Coinage(const uint8_t* unit) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0x1248); }
+ 
+     // The record and world object of the active player, which every confirmation check requires.
+     const uint8_t* ConfirmUnit()
+@@ -3643,7 +3643,7 @@ namespace
+             out.push_back({6, last, 0});
+         if (!WildcardMode())
+         {
+-            if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0xD8) > 9)
++            if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0xD8) > 9)
+                 CostConfirm(unit, UnlearnCostOf(b, r), 3, 4, 5, out);
+         }
+         else
+@@ -5145,7 +5145,7 @@ namespace
+         }
+         else
+         {
+-            const uint32_t level = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + 8) + 0xD8);
++            const uint32_t level = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0xD8);
+             Build b(AscBuildCreator::SeedFromLink(url), level, false);
+             copy.entries = b.entries;
+         }
+@@ -5195,7 +5195,7 @@ namespace
+             AscLua::luaL_error(L, "ImportPendingBuildID: invalid buildID");
+             return 0;
+         }
+-        const uint32_t level = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + 8) + 0xD8);
++        const uint32_t level = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0xD8);
+         Build b(seed, level, true);
+         uint32_t eid = 0, rank = 0, result = 0;
+         if (!b.ValidateAll(true, {}, {}, false, eid, rank, result))
+diff --git a/src/Ascension/AscCARules.cpp b/src/Ascension/AscCARules.cpp
+index 55e2db5..de24028 100644
+--- a/src/Ascension/AscCARules.cpp
++++ b/src/Ascension/AscCARules.cpp
+@@ -43,7 +43,7 @@ namespace
+     const uint32_t kMapDbc = 0xAD4160;   // Map.dbc container; +8 = instance type (1 party, 2 raid, 3 pvp, 4 arena)
+     const uint8_t* CurrentMap() { return ClientDbcRow(kMapDbc, *reinterpret_cast<const uint32_t*>(ASC_PTR(0xBD088C))); }
+     uint32_t MapType(const uint8_t* map) { return *reinterpret_cast<const uint32_t*>(map + 8); }
+-    const uint8_t* Descriptor(const uint8_t* unit) { return *reinterpret_cast<uint8_t* const*>(unit + 8); }
++    const uint8_t* Descriptor(const uint8_t* unit) { return *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)); }
+     bool InCombat(const uint8_t* unit) { return (*reinterpret_cast<const uint32_t*>(Descriptor(unit) + 0xEC) >> 19) & 1; }
+     uint64_t UnitGuid(const uint8_t* unit) { return *reinterpret_cast<const uint64_t*>(Descriptor(unit)); }
+     bool CoAClass(uint8_t c) { return c >= 12 && c <= 32; }
+@@ -896,7 +896,7 @@ namespace
+         for (uint32_t i = 0x76; i < 0x96; ++i)
+             if (const uint8_t* obj = static_cast<const uint8_t*>(ObjectPtr(*reinterpret_cast<const uint64_t*>(desc + 0x510 + i * 8), 2)))
+             {
+-                const uint8_t* itemDesc = *reinterpret_cast<uint8_t* const*>(obj + 8);
++                const uint8_t* itemDesc = *reinterpret_cast<uint8_t* const*>(obj + ASC_OFF(8, 0x10));
+                 if (*reinterpret_cast<const uint32_t*>(itemDesc + 0xC) == item)
+                     total += *reinterpret_cast<const uint32_t*>(itemDesc + 0x38);
+             }
+diff --git a/src/Ascension/AscCamera.cpp b/src/Ascension/AscCamera.cpp
+index 3697df7..03b7a9f 100644
+--- a/src/Ascension/AscCamera.cpp
++++ b/src/Ascension/AscCamera.cpp
+@@ -81,7 +81,7 @@ namespace
+     }
+     float Facing(uint8_t* unit)   // vtable +0x34
+     {
+-        return (*reinterpret_cast<float(__thiscall**)(void*)>(*reinterpret_cast<uint8_t**>(unit) + 0x34))(unit);
++        return (*reinterpret_cast<float(__thiscall**)(void*)>(*reinterpret_cast<uint8_t**>(unit) + ASC_OFF(0x34, 0x68)))(unit);
+     }
+ 
+     // ---- CVar callbacks ------------------------------------------------------------------------------------
+@@ -231,7 +231,7 @@ namespace
+                 float zero[3] = {0.0f, 0.0f, 0.0f};
+                 float one = 1.0f;
+                 uint8_t scratch[0x780];
+-                const float height = (*reinterpret_cast<float(__thiscall**)(void*)>(*reinterpret_cast<uint8_t**>(player) + 0x3C))(player);
++                const float height = (*reinterpret_cast<float(__thiscall**)(void*)>(*reinterpret_cast<uint8_t**>(player) + ASC_OFF(0x3C, 0x78)))(player);
+                 from[2] = static_cast<float>(height * 1.5L + from[2]);
+                 if (reinterpret_cast<bool(__cdecl*)(void*, float*, float*, float*, uint32_t, void*)>(ASC_PTR(0x77F310))(cam + 8, from, zero, &one, 0x100171, scratch))
+                 {
+@@ -271,7 +271,7 @@ namespace
+         if (!player)
+             return;
+         uint8_t* unit = ObjectByGuid(guid[0], guid[1], 8);
+-        if (!unit || *reinterpret_cast<const uint32_t*>(unit + 0x14) == 4)
++        if (!unit || *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x14, 0x24)) == 4)
+             return;
+         bool focus = false;
+         if (reinterpret_cast<bool(__thiscall*)(void*, void*)>(ASC_PTR(0x729A70))(player, unit) && ActionCam() &&
+@@ -287,7 +287,7 @@ namespace
+     // sub_10198e60: `mov ecx, [esp+4]; call 0x4D43C0` -- a __thiscall on the list's argument (the object's
+     // +0x144). Transcribed as a no-argument __cdecl until 2026-09-27, which left ECX to chance and crashed
+     // on release-to-graveyard (0x4D43C3 reading [null]).
+-    void Before6ECF80(uint32_t object)
++    void Before6ECF80(uintptr_t object)
+     {
+         if (reinterpret_cast<bool(__thiscall*)(void*)>(ASC_PTR(0x4D43C0))(reinterpret_cast<void*>(object)))
+             RestoreAlphas();
+diff --git a/src/Ascension/AscCanToggle.cpp b/src/Ascension/AscCanToggle.cpp
+index e8cf128..4dd21bf 100644
+--- a/src/Ascension/AscCanToggle.cpp
++++ b/src/Ascension/AscCanToggle.cpp
+@@ -136,7 +136,7 @@ namespace
+         if (enable && !ConfigOn("CONFIG_BUILD_DRAFT_ENABLED"))
+             reasons.push_back(2);
+         uint8_t* p = ActivePlayer();
+-        const uint8_t* d = p ? *reinterpret_cast<uint8_t**>(p + 8) : nullptr;
++        const uint8_t* d = p ? *reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) : nullptr;
+         if (enable && (!p || *reinterpret_cast<const uint32_t*>(d + 0xD8) > 9))
+             reasons.push_back(1);
+         if (enable == AscGameMode::SpecBuildDraft(AscGameMode::ActiveSpecIndex()))
+diff --git a/src/Ascension/AscChallenge.cpp b/src/Ascension/AscChallenge.cpp
+index 145d978..b5a1ead 100644
+--- a/src/Ascension/AscChallenge.cpp
++++ b/src/Ascension/AscChallenge.cpp
+@@ -267,12 +267,12 @@ namespace
+         const uint32_t type = *reinterpret_cast<uint32_t*>(p + 0x14);
+         if (type != 3 && type != 4)
+             return 0;
+-        return (*reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(p + 8) + 0x5C) >> 8) & 0xFF;
++        return (*reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) + 0x5C) >> 8) & 0xFF;
+     }
+     uint32_t PlayerLevel()
+     {
+         uint8_t* p = Player();
+-        return p ? *reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(p + 8) + 0xD8) : 0;
++        return p ? *reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) + 0xD8) : 0;
+     }
+     uint32_t Prestige()   // FUN_102d9f00: the per-unit record's +0x18
+     {
+diff --git a/src/Ascension/AscClientDbcPatch.cpp b/src/Ascension/AscClientDbcPatch.cpp
+index 28cefde..cf2db10 100644
+--- a/src/Ascension/AscClientDbcPatch.cpp
++++ b/src/Ascension/AscClientDbcPatch.cpp
+@@ -181,7 +181,7 @@ namespace
+         const ByGuid_t ByGuid = [](uint32_t lo, uint32_t hi, uint32_t m) -> void* { return static_cast<void*>(AscScript::ObjectPtr(AscX64::Guid(lo, hi), m)); };   // 0x4D4DB0 (x64: WOWGUID + arquivo/linha)
+         for (uint32_t i = 0; i < 0x27; ++i)
+         {
+-            const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(player + 8);
++            const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10));
+             ByGuid(*reinterpret_cast<const uint32_t*>(desc + 0x510 + i * 8), *reinterpret_cast<const uint32_t*>(desc + 0x514 + i * 8), 2);
+         }
+         for (uint8_t slot = 0x13; slot < 0x17; ++slot)
+@@ -193,7 +193,7 @@ namespace
+             void* container = (*reinterpret_cast<void*(__thiscall**)(void*)>(*reinterpret_cast<uint8_t**>(bag) + 0x24))(bag);
+             if (!container)
+                 continue;
+-            for (uint32_t i = 0; i < *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(bag + 8) + 0x100); ++i)
++            for (uint32_t i = 0; i < *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(bag + ASC_OFF(8, 0x10)) + 0x100); ++i)
+                 reinterpret_cast<void(__thiscall*)(void*, uint32_t)>(ASC_PTR(0x754390))(container, i);
+         }
+     }
+diff --git a/src/Ascension/AscClientOptions.cpp b/src/Ascension/AscClientOptions.cpp
+index 0a8998f..7b390e9 100644
+--- a/src/Ascension/AscClientOptions.cpp
++++ b/src/Ascension/AscClientOptions.cpp
+@@ -81,7 +81,7 @@ namespace
+             {
+                 const uint8_t* offset = Var("nameplateVerticalOffset");
+                 const float o = offset ? VarF(offset) : 0.7f;
+-                g_bubbleHeight = *reinterpret_cast<const uint32_t*>(unit + 0xC38) != 0 ? o + 1.0f : 0.7f;
++                g_bubbleHeight = *reinterpret_cast<const uintptr_t*>(unit + ASC_OFF(0xC38, 0x1470)) != 0 ? o + 1.0f : 0.7f;
+             }
+         }
+         else
+@@ -164,11 +164,11 @@ namespace
+         float r = 5.0f;
+         if (uint8_t* player = ActivePlayer())
+         {
+-            const float sum = *reinterpret_cast<const float*>(*reinterpret_cast<uint8_t* const*>(player + 8) + 0x108) +
+-                              *reinterpret_cast<const float*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0x108) + 1.33333337f;
++            const float sum = *reinterpret_cast<const float*>(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0x108) +
++                              *reinterpret_cast<const float*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0x108) + 1.33333337f;
+             r = sum > 5.0f ? sum : 5.0f;
+         }
+-        *reinterpret_cast<float*>(unit + 0xB0C) = r;
++        *reinterpret_cast<float*>(unit + ASC_OFF(0xB0C, 0x1324)) = r;
+     }
+     // sub_10a3ab20: every unit's radius recomputed through the (hooked) 0x720330.
+     int __cdecl RecomputeRadius(uint32_t lo, uint32_t hi, void*)
+diff --git a/src/Ascension/AscCrashContext.cpp b/src/Ascension/AscCrashContext.cpp
+index 2f32d60..e8e0cd3 100644
+--- a/src/Ascension/AscCrashContext.cpp
++++ b/src/Ascension/AscCrashContext.cpp
+@@ -131,7 +131,7 @@ namespace
+     Fn0_t g_717A20 = nullptr;
+     int __fastcall UnitModelData(void* unit ASC_EDX_P(void* edx))
+     {
+-        g_modelDataEntry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(unit) + 8) + 0xC);
++        g_modelDataEntry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(unit) + ASC_OFF(8, 0x10)) + 0xC);
+         return g_717A20(unit ASC_EDX_A(edx));
+     }
+ 
+@@ -145,7 +145,7 @@ namespace
+             g_detailDoodad = std::to_string(index);
+             return g_7B31E0(self ASC_EDX_A(edx), index, a2, a3, a4, a5, a6, a7);
+         }
+-        const uint8_t* chunk = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + 0x98);
++        const uint8_t* chunk = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + ASC_OFF(0x98, 0xF0));
+         const uint8_t* adt = *reinterpret_cast<uint8_t* const*>(*reinterpret_cast<uint8_t* const*>(chunk + 0x20) + 8);
+         char text[256];
+         snprintf(text, sizeof(text), "ADT: [%d,%d] Chunk: [%d,%d] has incorrect GroundEffectDoodad.dbc ID in MCLY.effectId: %u",
+@@ -166,7 +166,7 @@ namespace
+     Fn0_t g_7F6A10 = nullptr;
+     int __fastcall LoadGameTable(void* self ASC_EDX_P(void* edx))
+     {
+-        g_gameTable = *reinterpret_cast<const char* const*>(static_cast<uint8_t*>(self) + 4);
++        g_gameTable = *reinterpret_cast<const char* const*>(static_cast<uint8_t*>(self) + ASC_OFF(4, 8));
+         return g_7F6A10(self ASC_EDX_A(edx));
+     }
+ 
+@@ -192,7 +192,7 @@ namespace
+ 
+     int __fastcall M2SceneRender(void* self ASC_EDX_P(void* edx), uint32_t a)
+     {
+-        const uint8_t* model = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + 0x60);
++        const uint8_t* model = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + ASC_OFF(0x60, 0x78));
+         g_m2SceneRender = reinterpret_cast<const char*>(*reinterpret_cast<uint8_t* const*>(model + 0x2C) + 0x3C);
+         return g_81F700(self ASC_EDX_A(edx), a);
+     }
+@@ -235,17 +235,17 @@ namespace
+     }
+     int __fastcall M2Skin(void* self ASC_EDX_P(void* edx), uint32_t a)
+     {
+-        g_m2Skin = reinterpret_cast<const char*>(static_cast<uint8_t*>(self) + 0x3C);
++        g_m2Skin = reinterpret_cast<const char*>(static_cast<uint8_t*>(self) + ASC_OFF(0x3C, 0x74));
+         return g_838490(self ASC_EDX_A(edx), a);
+     }
+     int __fastcall M2WaitForLoad(void* self ASC_EDX_P(void* edx), uintptr_t a)   // FUN_1019d830: no null check
+     {
+-        g_m2WaitForLoad = reinterpret_cast<const char*>(*reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + 0x2C) + 0x3C);
++        g_m2WaitForLoad = reinterpret_cast<const char*>(*reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + ASC_OFF(0x2C, 0x48)) + ASC_OFF(0x3C, 0x74));
+         return g_823ED0(self ASC_EDX_A(edx), a);
+     }
+     int __fastcall M2Guarded(void* self ASC_EDX_P(void* edx), uint32_t a)   // 0x1019D810
+     {
+-        if (*reinterpret_cast<void* const*>(static_cast<uint8_t*>(self) + 0x2C) == nullptr)
++        if (*reinterpret_cast<void* const*>(static_cast<uint8_t*>(self) + ASC_OFF(0x2C, 0x48)) == nullptr)
+             return 0;
+         return g_823F10(self ASC_EDX_A(edx), a);
+     }
+diff --git a/src/Ascension/AscCustomStore.cpp b/src/Ascension/AscCustomStore.cpp
+index 98cb148..9a2641d 100644
+--- a/src/Ascension/AscCustomStore.cpp
++++ b/src/Ascension/AscCustomStore.cpp
+@@ -84,7 +84,7 @@ namespace
+     uint32_t Money()
+     {
+         uint8_t* p = ActivePlayer();
+-        return p ? *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(p + 8) + 0x1248) : 0;
++        return p ? *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) + 0x1248) : 0;
+     }
+     uint32_t Held(uint32_t item) { return AscItems::BagItemCount(item) + AscCA::UnitItemCount(ActivePlayer(), item); }
+ 
+@@ -122,7 +122,7 @@ namespace
+             float q[3];
+             Position(o, q);
+             const double d = std::sqrt(std::pow(q[0] - p[0], 2.0) + std::pow(q[1] - p[1], 2.0) + std::pow(q[2] - p[2], 2.0));
+-            if (static_cast<float>(d) <= 5.5f && *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(o + 8) + 0xC) == entry)
++            if (static_cast<float>(d) <= 5.5f && *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(o + ASC_OFF(8, 0x10)) + 0xC) == entry)
+                 return true;
+         }
+         return false;
+diff --git a/src/Ascension/AscDraftMode.cpp b/src/Ascension/AscDraftMode.cpp
+index 74993d2..add599e 100644
+--- a/src/Ascension/AscDraftMode.cpp
++++ b/src/Ascension/AscDraftMode.cpp
+@@ -365,7 +365,7 @@ namespace
+         uint8_t* player = ActivePlayer();
+         if (!player)
+             return 0;
+-        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(player + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10));
+         if (*reinterpret_cast<const uint64_t*>(desc) != ActivePlayerGuid())
+             return 0;
+         uint32_t total = 0;
+@@ -374,7 +374,7 @@ namespace
+             const uint64_t guid = *reinterpret_cast<const uint64_t*>(desc + 0x510 + i * 8);
+             if (const uint8_t* item = static_cast<const uint8_t*>(ObjectPtr(guid, 2)))
+             {
+-                const uint8_t* idesc = *reinterpret_cast<uint8_t* const*>(item + 8);
++                const uint8_t* idesc = *reinterpret_cast<uint8_t* const*>(item + ASC_OFF(8, 0x10));
+                 if (*reinterpret_cast<const uint32_t*>(idesc + 0xC) == entry)
+                     total += *reinterpret_cast<const uint32_t*>(idesc + 0x38);
+             }
+@@ -401,7 +401,7 @@ namespace
+         for (const Reward* r : recs)
+         {
+             if (uint8_t* player = ActivePlayer())
+-                if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + 8) + 0xD8) < r->level)
++                if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0xD8) < r->level)
+                     return 6;
+             if (now < static_cast<__time64_t>(r->release))
+                 return 7;
+diff --git a/src/Ascension/AscEventPackets.cpp b/src/Ascension/AscEventPackets.cpp
+index f9347c4..159f9ee 100644
+--- a/src/Ascension/AscEventPackets.cpp
++++ b/src/Ascension/AscEventPackets.cpp
+@@ -242,7 +242,7 @@ namespace
+                     float a[3], b[3];
+                     typedef void(__thiscall* Pos_t)(void*, float*);
+                     (*reinterpret_cast<Pos_t*>(*reinterpret_cast<uint8_t**>(src) + 0x2C))(src, a);
+-                    (*reinterpret_cast<Pos_t*>(*reinterpret_cast<uint8_t**>(me) + 0x2C))(me, b);
++                    (*reinterpret_cast<Pos_t*>(*reinterpret_cast<uint8_t**>(me) + ASC_OFF(0x2C, 0x58)))(me, b);
+                     const float dx = b[0] - a[0], dy = b[1] - a[1];
+                     if (!(r * r >= dy * dy + dx * dx))
+                         return 1;
+@@ -458,7 +458,7 @@ namespace
+     void WatchLevel()
+     {
+         const uint8_t* player = AscScript::ActivePlayer();
+-        const uint32_t level = player ? *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(player + 8) + 0xD8) : 0;
++        const uint32_t level = player ? *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0xD8) : 0;
+         if (level == g_lastLevel)
+             return;
+         AscRuntime::Signal("ASCENSION_PLAYER_LEVEL_UP", "%u%u", level, g_lastLevel);
+diff --git a/src/Ascension/AscExtraActionButton.cpp b/src/Ascension/AscExtraActionButton.cpp
+index dad4be5..0f7e245 100644
+--- a/src/Ascension/AscExtraActionButton.cpp
++++ b/src/Ascension/AscExtraActionButton.cpp
+@@ -51,7 +51,7 @@ namespace
+     std::vector<uint8_t*> PlayerItems(uint8_t* player)
+     {
+         std::vector<uint8_t*> items;
+-        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + ASC_OFF(8, 0x10));
+         for (int slot = 0; slot < 0x27; ++slot)
+             if (uint8_t* item = static_cast<uint8_t*>(ObjectPtr(*reinterpret_cast<const uint64_t*>(desc + 0x510 + slot * 8), 2)))
+                 items.push_back(item);
+@@ -65,7 +65,7 @@ namespace
+             void* inv = (*reinterpret_cast<Inventory_t**>(container))[0x24 / 4](container);
+             if (!inv)
+                 continue;
+-            const uint32_t slots = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(container + 8) + 0x100);
++            const uint32_t slots = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(container + ASC_OFF(8, 0x10)) + 0x100);
+             for (uint32_t i = 0; i < slots; ++i)
+                 if (uint8_t* item = reinterpret_cast<uint8_t*(__thiscall*)(void*, uint32_t)>(ASC_PTR(0x754390))(inv, i))
+                     items.push_back(item);
+@@ -102,7 +102,7 @@ namespace
+         }
+         case 5:
+             for (uint8_t* item : PlayerItems(player))
+-                if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(item + 8) + 0xC) == arg)
++                if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(item + ASC_OFF(8, 0x10)) + 0xC) == arg)
+                     return true;
+             return false;
+         default:
+diff --git a/src/Ascension/AscFontRender.cpp b/src/Ascension/AscFontRender.cpp
+index 33139cb..5fdc431 100644
+--- a/src/Ascension/AscFontRender.cpp
++++ b/src/Ascension/AscFontRender.cpp
+@@ -281,7 +281,7 @@ namespace
+         const int32_t rows = static_cast<int32_t>(g->rows);
+         int32_t height = rows;
+         if (self)
+-            if (const uint8_t* owner = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + 4))
++            if (const uint8_t* owner = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + ASC_OFF(4, 8)))
+                 height = *reinterpret_cast<const int32_t*>(owner + 0x178);
+ 
+         const int32_t top = g->top;
+@@ -336,7 +336,7 @@ namespace
+     Fn6C4AD0_t g_6C4AD0 = nullptr;
+     int __fastcall DrawString(void* self ASC_EDX_P(void* edx))   // FUN_10236fd0
+     {
+-        const uint8_t* font = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + 0x18);
++        const uint8_t* font = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(self) + ASC_OFF(0x18, 0x30));
+         if (g_fontShader && reinterpret_cast<int(__thiscall*)(void*)>(ASC_PTR(0x689A50))(g_fontShader) && font)
+         {
+             reinterpret_cast<void(__cdecl*)(int, void*)>(ASC_PTR(0x408240))(0x4E, g_fontShader);
+diff --git a/src/Ascension/AscGameObjectUse.cpp b/src/Ascension/AscGameObjectUse.cpp
+index f5fbd7a..8e0ba8a 100644
+--- a/src/Ascension/AscGameObjectUse.cpp
++++ b/src/Ascension/AscGameObjectUse.cpp
+@@ -11,7 +11,7 @@ namespace
+     void OnGameObjectUse(void* object)
+     {
+         const uint8_t* go = static_cast<const uint8_t*>(object);
+-        const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(go + 8) + 0xC);
++        const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(go + ASC_OFF(8, 0x10)) + 0xC);
+         AscMysticEnchant::GameObjectUsed(entry);
+         AscRuntime::Signal("GAMEOBJECT_USED", "%u", entry);
+     }
+diff --git a/src/Ascension/AscGeosets.cpp b/src/Ascension/AscGeosets.cpp
+index ceaa44f..9042f4f 100644
+--- a/src/Ascension/AscGeosets.cpp
++++ b/src/Ascension/AscGeosets.cpp
+@@ -115,7 +115,7 @@ namespace
+     This2_t g_73D5D0 = nullptr;
+     This3_t g_73FCC0 = nullptr;
+ 
+-    uint32_t Descriptor(uint8_t* unit, uint32_t off) { return U32(*reinterpret_cast<uint8_t**>(unit + 8), off); }
++    uint32_t Descriptor(uint8_t* unit, uint32_t off) { return U32(*reinterpret_cast<uint8_t**>(unit + ASC_OFF(8, 0x10)), off); }
+ 
+     int __cdecl Hook4E3CD0()   // 0x101A12F0
+     {
+diff --git a/src/Ascension/AscGlobalsB.cpp b/src/Ascension/AscGlobalsB.cpp
+index 3d7e0e2..5fd5e92 100644
+--- a/src/Ascension/AscGlobalsB.cpp
++++ b/src/Ascension/AscGlobalsB.cpp
+@@ -46,7 +46,7 @@ namespace
+     uint8_t* PlayerDescriptors()
+     {
+         uint8_t* p = ActivePlayer();
+-        return p ? *reinterpret_cast<uint8_t**>(p + 8) : nullptr;
++        return p ? *reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) : nullptr;
+     }
+     int32_t ArgInt(lua_State* L, int idx) { return ToInt(CheckNumber(L, idx)); }
+     void PushGuidString(lua_State* L, uint32_t lo, uint32_t hi)   // 0x74D0D0
+diff --git a/src/Ascension/AscGlobalsC.cpp b/src/Ascension/AscGlobalsC.cpp
+index 833996d..431f868 100644
+--- a/src/Ascension/AscGlobalsC.cpp
++++ b/src/Ascension/AscGlobalsC.cpp
+@@ -24,7 +24,7 @@ namespace
+     uint8_t* PlayerDescriptors()
+     {
+         uint8_t* p = ActivePlayer();
+-        return p ? *reinterpret_cast<uint8_t**>(p + 8) : nullptr;
++        return p ? *reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) : nullptr;
+     }
+ 
+     int GetScreenLocationInfo(lua_State* L)
+@@ -151,7 +151,7 @@ namespace
+         int32_t delay = 2000;
+         if (uint8_t* item = static_cast<uint8_t*>(ObjectPtr(guid, 2)))
+         {
+-            const uint32_t entry = *reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(item + 8) + 0xC);
++            const uint32_t entry = *reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(item + ASC_OFF(8, 0x10)) + 0xC);
+             const uint8_t* rec = static_cast<const uint8_t*>(
+                 reinterpret_cast<void*(__thiscall*)(void*, uint32_t, void*, void*, void*, int)>(ASC_PTR(0x67CA30))(
+                     reinterpret_cast<void*>(ASC_PTR(0xC5D828)), entry, nullptr, nullptr, nullptr, 0));
+diff --git a/src/Ascension/AscGlobalsD.cpp b/src/Ascension/AscGlobalsD.cpp
+index 39a07d2..1a033f7 100644
+--- a/src/Ascension/AscGlobalsD.cpp
++++ b/src/Ascension/AscGlobalsD.cpp
+@@ -179,12 +179,12 @@ namespace
+             const uint32_t slot = static_cast<uint32_t>(ToInt(AscLua::lua_tonumber(L, 2)) - 1);
+             if (slot < 0x24)
+             {
+-                const uint8_t* d = *reinterpret_cast<uint8_t**>(p + 8);
++                const uint8_t* d = *reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10));
+                 const uint32_t* g = nullptr;
+                 if (bag == 0)
+                     g = reinterpret_cast<const uint32_t*>(d + 0x5C8 + slot * 8);
+                 else if (uint8_t* c = static_cast<uint8_t*>(ObjectPtr(*reinterpret_cast<const uint64_t*>(d + 0x5A0 + bag * 8), 4)))
+-                    g = reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(c + 8) + 0x108 + slot * 8);
++                    g = reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(c + ASC_OFF(8, 0x10)) + 0x108 + slot * 8);
+                 if (g && (g[0] || g[1]))
+                 {
+                     PushGuid(L, g[0], g[1]);
+@@ -205,9 +205,9 @@ namespace
+         {
+             const uint64_t guid = reinterpret_cast<uint64_t(__cdecl*)(const char*)>(ASC_PTR(0x60C1C0))(token.c_str());
+             uint8_t* obj = guid ? static_cast<uint8_t*>(ObjectPtr(guid, 8)) : nullptr;
+-            if (obj && *reinterpret_cast<int32_t*>(obj + 0x14) == 4)
++            if (obj && *reinterpret_cast<int32_t*>(obj + ASC_OFF(0x14, 0x24)) == 4)
+             {
+-                const uint32_t* g = reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(obj + 8) + 0x510 + slot * 8);
++                const uint32_t* g = reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(obj + ASC_OFF(8, 0x10)) + 0x510 + slot * 8);
+                 if (g[0] || g[1])
+                 {
+                     PushGuid(L, g[0], g[1]);
+diff --git a/src/Ascension/AscGlobalsF.cpp b/src/Ascension/AscGlobalsF.cpp
+index ce0c42e..2e2132f 100644
+--- a/src/Ascension/AscGlobalsF.cpp
++++ b/src/Ascension/AscGlobalsF.cpp
+@@ -114,9 +114,9 @@ namespace
+         const uint8_t* unit = reinterpret_cast<const uint8_t*(__cdecl*)(const char*)>(ASC_PTR(0x60C1F0))(token.c_str());
+         if (!unit)
+             return 0;
+-        int32_t id = *reinterpret_cast<const int32_t*>(unit + 0xA6C);
++        int32_t id = *reinterpret_cast<const int32_t*>(unit + ASC_OFF(0xA6C, 0x1268));
+         if (id == 0)
+-            id = *reinterpret_cast<const int32_t*>(unit + 0xA80);
++            id = *reinterpret_cast<const int32_t*>(unit + ASC_OFF(0xA80, 0x1280));
+         AscLua::lua_pushinteger(L, id);
+         return 1;
+     }
+@@ -132,7 +132,7 @@ namespace
+             AscLua::lua_pushnil(L);
+             return 1;
+         }
+-        AscLua::lua_pushboolean(L, (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(obj + 8) + 0x13C) >> 8) & 1);
++        AscLua::lua_pushboolean(L, (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(obj + ASC_OFF(8, 0x10)) + 0x13C) >> 8) & 1);
+         return 1;
+     }
+ 
+diff --git a/src/Ascension/AscGlobalsG.cpp b/src/Ascension/AscGlobalsG.cpp
+index 5baf926..c6ab669 100644
+--- a/src/Ascension/AscGlobalsG.cpp
++++ b/src/Ascension/AscGlobalsG.cpp
+@@ -101,7 +101,7 @@ namespace
+         const uint8_t* row = nullptr;
+         if (UnitTokenGuid(CheckString(L, 1), guid) && (unit = static_cast<const uint8_t*>(ObjectPtr(guid, 0x10))) != nullptr)
+         {
+-            const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + 8);
++            const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+             const uint32_t title = reinterpret_cast<uint32_t(__stdcall*)(uint32_t)>(ASC_PTR(0x719900))(*reinterpret_cast<const uint32_t*>(d + 0x504));
+             if (title)
+                 row = ClientDbcRow(0xAD3374, title);
+@@ -111,8 +111,8 @@ namespace
+             AscLua::lua_pushnil(L);
+             return 1;
+         }
+-        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + 8);
+-        const int32_t type = *reinterpret_cast<const int32_t*>(unit + 0x14);
++        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
++        const int32_t type = *reinterpret_cast<const int32_t*>(unit + ASC_OFF(0x14, 0x24));
+         const bool female = (type == 3 || type == 4) && static_cast<uint8_t>(*reinterpret_cast<const uint32_t*>(d + 0x5C) >> 16) != 0;
+         PushStr(L, *reinterpret_cast<const char* const*>(row + (female ? 0x0C : 0x08)));
+         return 1;
+@@ -126,7 +126,7 @@ namespace
+         if (!ReadString(L, text) || text.empty())
+             return 0;
+         if (uint8_t* p = ActivePlayer())
+-            if ((*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(p + 8) + 0xEC) >> 19) & 1)
++            if ((*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(p + ASC_OFF(8, 0x10)) + 0xEC) >> 19) & 1)
+                 return 0;
+         if (!OpenClipboard(nullptr))
+             return 0;
+diff --git a/src/Ascension/AscGlobalsI.cpp b/src/Ascension/AscGlobalsI.cpp
+index 81f0057..0e24abb 100644
+--- a/src/Ascension/AscGlobalsI.cpp
++++ b/src/Ascension/AscGlobalsI.cpp
+@@ -130,7 +130,7 @@ namespace
+ 
+     void TargetUnit(const uint8_t* obj)   // FUN_10111d00 -> 0x524BF0
+     {
+-        const uint32_t* g = *reinterpret_cast<const uint32_t* const*>(obj + 8);
++        const uint32_t* g = *reinterpret_cast<const uint32_t* const*>(obj + ASC_OFF(8, 0x10));
+ #if ASC_X64
+         reinterpret_cast<void (*)(uint64_t)>(ASC_PTR(0x524BF0))(AscX64::Guid(g[0], g[1]));   // CGGameUI::Target(WOWGUID)
+ #else
+@@ -157,7 +157,7 @@ namespace
+         if (uint8_t* best = Closest(c))
+         {
+             reinterpret_cast<void(__thiscall*)(void*)>((*reinterpret_cast<void***>(best))[0xB0 / 4])(best);
+-            if (*reinterpret_cast<const int32_t*>(best + 0x14) == 3)
++            if (*reinterpret_cast<const int32_t*>(best + ASC_OFF(0x14, 0x24)) == 3)
+                 TargetUnit(best);
+         }
+         return 0;
+@@ -195,7 +195,7 @@ namespace
+         }
+         if (uint8_t* best = Closest(c))
+         {
+-            if (*reinterpret_cast<const int32_t*>(best + 0x14) == 3)
++            if (*reinterpret_cast<const int32_t*>(best + ASC_OFF(0x14, 0x24)) == 3)
+                 TargetUnit(best);
+             WriteProtected(0xD4139C, saved);
+         }
+diff --git a/src/Ascension/AscGlobalsJ.cpp b/src/Ascension/AscGlobalsJ.cpp
+index 12ae5e6..42a67e6 100644
+--- a/src/Ascension/AscGlobalsJ.cpp
++++ b/src/Ascension/AscGlobalsJ.cpp
+@@ -411,7 +411,7 @@ namespace
+     const uint8_t* ItemDescriptor(uint64_t guid)
+     {
+         void* item = ObjectPtr(guid, 2);
+-        return item ? *reinterpret_cast<const uint8_t* const*>(static_cast<uint8_t*>(item) + 8) : nullptr;
++        return item ? *reinterpret_cast<const uint8_t* const*>(static_cast<uint8_t*>(item) + ASC_OFF(8, 0x10)) : nullptr;
+     }
+ 
+     // GetWeaponTempEnchantInfo(slot): the item in inventory slot `slot` (player descriptor +0x508 +
+@@ -426,7 +426,7 @@ namespace
+         }
+         if (uint8_t* player = ActivePlayer())
+         {
+-            const uint8_t* desc = *reinterpret_cast<const uint8_t* const*>(player + 8);
++            const uint8_t* desc = *reinterpret_cast<const uint8_t* const*>(player + ASC_OFF(8, 0x10));
+             if (const uint8_t* item = ItemDescriptor(*reinterpret_cast<const uint64_t*>(desc + 0x508 + slot * 8)))
+             {
+                 const uint32_t enchant = *reinterpret_cast<const uint32_t*>(item + 100);
+@@ -447,7 +447,7 @@ namespace
+     {
+         if (uint8_t* player = ActivePlayer())
+         {
+-            const uint8_t* desc = *reinterpret_cast<const uint8_t* const*>(player + 8);
++            const uint8_t* desc = *reinterpret_cast<const uint8_t* const*>(player + ASC_OFF(8, 0x10));
+             if (const uint8_t* item = ItemDescriptor(*reinterpret_cast<const uint64_t*>(desc + 0x598)))
+             {
+                 const uint32_t enchant = *reinterpret_cast<const uint32_t*>(item + 100);
+@@ -1651,7 +1651,7 @@ namespace
+         typedef int(__thiscall * GetRec_t)(void*, uint32_t, void*);
+         if (player && AscClientDbc::Copy(0x4CFD90, 0xAD3DDC, 0x11, display))
+             reinterpret_cast<void(__cdecl*)(uintptr_t, int32_t, char*, char*, int, void*)>(ASC_PTR(0x4EAA70))(
+-                *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(player + 0xB4C) + 0x38), slot,
++                *reinterpret_cast<const uintptr_t*>(*reinterpret_cast<const uint8_t* const*>(player + ASC_OFF(0xB4C, 0x1370)) + ASC_OFF(0x38, 0x40)), slot,
+                 reinterpret_cast<char*>(ASC_PTR(0xB6B600)), reinterpret_cast<char*>(ASC_PTR(0xB6B4F8)), 0, display);
+         return 0;
+     }
+diff --git a/src/Ascension/AscGossipQuest.cpp b/src/Ascension/AscGossipQuest.cpp
+index c94fd35..9130504 100644
+--- a/src/Ascension/AscGossipQuest.cpp
++++ b/src/Ascension/AscGossipQuest.cpp
+@@ -144,7 +144,7 @@ namespace
+     {
+         g_remove(player ASC_EDX_A(edx), slot);
+ #endif
+-        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(player + 8);
++        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10));
+         AscRuntime::Signal("QUEST_REMOVED", "%u", *reinterpret_cast<const uint32_t*>(d + 0x278 + slot * 0x14));
+     }
+ 
+diff --git a/src/Ascension/AscGroupFinder.cpp b/src/Ascension/AscGroupFinder.cpp
+index ee81a30..61326ec 100644
+--- a/src/Ascension/AscGroupFinder.cpp
++++ b/src/Ascension/AscGroupFinder.cpp
+@@ -72,7 +72,7 @@ namespace
+     uint32_t PlayerLevel()   // descriptor +0xD8 = UNIT_FIELD_LEVEL
+     {
+         uint8_t* p = ActivePlayer();
+-        return p ? *reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(p + 8) + 0xD8) : 0;
++        return p ? *reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) + 0xD8) : 0;
+     }
+     const char* PlayerName()
+     {
+diff --git a/src/Ascension/AscInitHooks.cpp b/src/Ascension/AscInitHooks.cpp
+index 1dc1d09..111c592 100644
+--- a/src/Ascension/AscInitHooks.cpp
++++ b/src/Ascension/AscInitHooks.cpp
+@@ -46,7 +46,7 @@ namespace
+     typedef uint8_t*(__cdecl* ObjectByGuid_t)(uint32_t lo, uint32_t hi, uint32_t typeMask);
+     const ObjectByGuid_t ObjectByGuid = [](uint32_t lo, uint32_t hi, uint32_t m) -> uint8_t* { return static_cast<uint8_t*>(AscScript::ObjectPtr(AscX64::Guid(lo, hi), m)); };   // 0x4D4DB0 (x64: WOWGUID + arquivo/linha)
+     uint8_t* ActivePlayer() { return reinterpret_cast<uint8_t*(__cdecl*)()>(ASC_PTR(0x4038F0))(); }
+-    uint8_t* Descriptor(const void* object) { return *reinterpret_cast<uint8_t* const*>(static_cast<const uint8_t*>(object) + 8); }
++    uint8_t* Descriptor(const void* object) { return *reinterpret_cast<uint8_t* const*>(static_cast<const uint8_t*>(object) + ASC_OFF(8, 0x10)); }
+ 
+     void WriteByte(uint32_t at, uint8_t value)
+     {
+@@ -99,7 +99,7 @@ namespace
+     {
+         const int r = g_717910(self ASC_EDX_A(edx), a);
+         if (a == 0)
+-            *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(self) + 0xB7C) = 0x5B;
++            *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(self) + ASC_OFF(0xB7C, 0x13B4)) = 0x5B;
+         return r;
+     }
+ 
+@@ -117,7 +117,7 @@ namespace
+         const uint8_t* row = nullptr;
+         if (id)   // FUN_100b2620, SpellVisual.dbc
+             row = AscClientDbc::Row(0xAD4AA8, id);
+-        if (row && *reinterpret_cast<const uint32_t*>(obj + 0x240) && *reinterpret_cast<const uint32_t*>(row + 0x1C) &&
++        if (row && *reinterpret_cast<const uint32_t*>(obj + ASC_OFF(0x240, 0x250)) && *reinterpret_cast<const uint32_t*>(row + 0x1C) &&
+             *reinterpret_cast<const uint32_t*>(row + 0xC) && *reinterpret_cast<const uint32_t*>(row + 0x50))
+         {
+             WriteByte(0x6FD59E, 0);
+@@ -242,7 +242,7 @@ namespace
+     {
+         const int r = g_7441D0(self ASC_EDX_A(edx), f);
+         if (static_cast<const uint32_t*>(self)[5] == 5)
+-            (*reinterpret_cast<void(__thiscall**)(void*, int)>(*static_cast<uint8_t**>(self) + 0x14))(self, 1);
++            (*reinterpret_cast<void(__thiscall**)(void*, int)>(*static_cast<uint8_t**>(self) + ASC_OFF(0x14, 0x28)))(self, 1);
+         return r;
+     }
+ 
+diff --git a/src/Ascension/AscItemCollections.cpp b/src/Ascension/AscItemCollections.cpp
+index a8c6524..25d2213 100644
+--- a/src/Ascension/AscItemCollections.cpp
++++ b/src/Ascension/AscItemCollections.cpp
+@@ -315,14 +315,14 @@ namespace
+     // client knows (0x707330) re-runs 0x72B7F0 with (state byte +0x1E8 != 2) for units and players.
+     void RefreshUnit(uint8_t* unit)
+     {
+-        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + 8);
++        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+         const uint64_t guid = *reinterpret_cast<const uint64_t*>(d + 0x598);
+         if (guid == 0)
+             return;
+         void* object = ObjectPtr(guid, 2);
+         if (!object || !reinterpret_cast<int(__thiscall*)(void*)>(ASC_PTR(0x707330))(object))
+             return;
+-        const uint32_t type = *reinterpret_cast<const uint32_t*>(unit + 0x14);
++        const uint32_t type = *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x14, 0x24));
+         const uint8_t state = (type == 3 || type == 4) ? d[0x1E8] : 0;
+         reinterpret_cast<int(__thiscall*)(void*, int, void*)>(ASC_PTR(0x72B7F0))(unit, state != 2 ? 1 : 0, nullptr);   // ShowRangedWeapon(sheathed, bool* rightHand)
+     }
+@@ -348,19 +348,19 @@ namespace
+     {
+         const int r = g_72B7F0(ecx ASC_EDX_A(edx), a, b);
+         uint8_t* unit = static_cast<uint8_t*>(ecx);
+-        if (static_cast<uint8_t>(a) != 0 || *reinterpret_cast<const uint32_t*>(unit + 0x14) != 4 || unit == ActivePlayer())
++        if (static_cast<uint8_t>(a) != 0 || *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x14, 0x24)) != 4 || unit == ActivePlayer())
+             return r;
+-        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + 8);
++        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+         const uint8_t* item = reinterpret_cast<const uint8_t*(__thiscall*)(void*, uint32_t, void*, void*, void*, int)>(ASC_PTR(0x67CA30))(
+             reinterpret_cast<void*>(ASC_PTR(0xC5D828)), *reinterpret_cast<const uint32_t*>(d + 0x4EC), nullptr, nullptr, nullptr, 0);
+-        if (!item || *reinterpret_cast<const uint32_t*>(item + 4) != 2 || *reinterpret_cast<const uint32_t*>(item + 8) != 2)
++        if (!item || *reinterpret_cast<const uint32_t*>(item + ASC_OFF(4, 8)) != 2 || *reinterpret_cast<const uint32_t*>(item + ASC_OFF(8, 0xC)) != 2)
+             return r;
+         strcpy(reinterpret_cast<char*>(ASC_PTR(0xB6B600)), "Item\\ObjectComponents\\Quiver\\Quiver_A.mdx");
+         strcpy(reinterpret_cast<char*>(ASC_PTR(0xB6B4F8)), "Item\\ObjectComponents\\Quiver\\Quiver_Alliance_A_04Brown.blp");
+         uint8_t display[0x64];
+         if (AscClientDbc::Copy(0x4CFD90, 0xAD3DDC, 0x5350, display))
+             reinterpret_cast<void(__cdecl*)(uintptr_t, uint32_t, char*, char*, int, void*)>(ASC_PTR(0x4EAA70))(
+-                *reinterpret_cast<const uint32_t*>(unit + 0xB4), 0x1A, reinterpret_cast<char*>(ASC_PTR(0xB6B600)),
++                *reinterpret_cast<const uintptr_t*>(unit + ASC_OFF(0xB4, 0x138)), 0x1A, reinterpret_cast<char*>(ASC_PTR(0xB6B600)),
+                 reinterpret_cast<char*>(ASC_PTR(0xB6B4F8)), 0, display);
+         return r;
+     }
+@@ -402,8 +402,8 @@ namespace
+     int __fastcall Detour6E08C0(void* ecx ASC_EDX_P(void* edx), uintptr_t a, uint32_t slot)
+     {
+         uint8_t* unit = static_cast<uint8_t*>(ecx);
+-        if (*reinterpret_cast<const uint32_t*>(unit + 0x14) == 4)
+-            if (uint8_t* component = *reinterpret_cast<uint8_t* const*>(unit + 0xB4C))
++        if (*reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x14, 0x24)) == 4)
++            if (uint8_t* component = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(0xB4C, 0x1370)))
+             {
+                 const int32_t index = SlotIndex(slot);
+                 if (index != -1)
+diff --git a/src/Ascension/AscItemUse.cpp b/src/Ascension/AscItemUse.cpp
+index a750e92..0a9094a 100644
+--- a/src/Ascension/AscItemUse.cpp
++++ b/src/Ascension/AscItemUse.cpp
+@@ -71,7 +71,7 @@ namespace
+     void OnItemUse(void* object)
+     {
+         const uint8_t* item = static_cast<const uint8_t*>(object);
+-        const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(item + 8) + 0xC);
++        const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(item + ASC_OFF(8, 0x10)) + 0xC);
+         if (entry)
+             Route(entry);
+         AscCollectorCache_ItemUsed(entry);
+diff --git a/src/Ascension/AscLootLockout.cpp b/src/Ascension/AscLootLockout.cpp
+index 65510b7..7638e8f 100644
+--- a/src/Ascension/AscLootLockout.cpp
++++ b/src/Ascension/AscLootLockout.cpp
+@@ -295,7 +295,7 @@ namespace
+         const std::string token = CheckString(L, 1);
+         if (const uint8_t* unit = static_cast<const uint8_t*>(ObjectPtr(TokenGuid(token.c_str()), 8)))
+         {
+-            const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0xC);
++            const uint32_t entry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0xC);
+             AscDbc::Table& t = AscDbc::Get("DBFilesClient\\DungeonEncounterExtra.dbc");
+             for (uint32_t id = t.MinId(); t.Loaded() && id < t.MaxId() + 1; ++id)
+                 if (const uint8_t* row = t.Row(id))
+diff --git a/src/Ascension/AscManastorm.cpp b/src/Ascension/AscManastorm.cpp
+index b90eb04..d245cd0 100644
+--- a/src/Ascension/AscManastorm.cpp
++++ b/src/Ascension/AscManastorm.cpp
+@@ -157,7 +157,7 @@ namespace
+     // ---- client state ------------------------------------------------------------------------------
+     uint32_t PlayerLevel(const uint8_t* player)   // descriptor +0xD8 (UNIT_FIELD_LEVEL)
+     {
+-        return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(player + 8) + 0xD8);
++        return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0xD8);
+     }
+ 
+     // FUN_102a4920: the player is at or above the server's max level (never below 60).
+@@ -662,7 +662,7 @@ namespace
+         if (g_mgr.level == 0 || g_objectiveIconTime <= 0)
+             return;
+         const uint8_t* o = static_cast<const uint8_t*>(object);
+-        const uint32_t* guid = *reinterpret_cast<const uint32_t* const*>(o + 8);
++        const uint32_t* guid = *reinterpret_cast<const uint32_t* const*>(o + ASC_OFF(8, 0x10));
+ #if ASC_X64
+         if (reinterpret_cast<int (*)(uint64_t)>(ASC_PTR(0x5728C0))(AscX64::Guid(guid[0], guid[1])) >= 8)   // GetRaidTargetIndexFromGuid(WOWGUID)
+ #else
+@@ -670,7 +670,7 @@ namespace
+         if (reinterpret_cast<RaidTarget_t>(ASC_PTR(0x5728C0))(guid[0], guid[1]) >= 8)
+ #endif
+             return;
+-        if (*reinterpret_cast<const uint32_t*>(o + 0x14) != 3)
++        if (*reinterpret_cast<const uint32_t*>(o + ASC_OFF(0x14, 0x24)) != 3)
+             return;
+         uint8_t* player = ActivePlayer();
+         if (!player)   // the original calls through it unchecked
+diff --git a/src/Ascension/AscMovementForce.cpp b/src/Ascension/AscMovementForce.cpp
+index 7034681..6ab1972 100644
+--- a/src/Ascension/AscMovementForce.cpp
++++ b/src/Ascension/AscMovementForce.cpp
+@@ -77,13 +77,13 @@ namespace
+     uint8_t* MovementOf(uint64_t guid)   // FUN_102b8fc0: object (units and players) +0xD8
+     {
+         const uint8_t* o = static_cast<uint8_t*>(AscScript::ObjectPtr(guid, 0x18));
+-        return o ? *reinterpret_cast<uint8_t* const*>(o + 0xD8) : nullptr;
++        return o ? *reinterpret_cast<uint8_t* const*>(o + ASC_OFF(0xD8, 0x170)) : nullptr;
+     }
+-    uint32_t& Flags(uint8_t* m) { return *reinterpret_cast<uint32_t*>(m + 0x44); }
+-    float* Pos(uint8_t* m) { return reinterpret_cast<float*>(m + 0x10); }
+-    float* Facing(uint8_t* m) { return reinterpret_cast<float*>(m + 0x4C); }
+-    uint8_t* Controller(uint8_t* m) { return *reinterpret_cast<uint8_t**>(m + 0x144); }
+-    uint64_t ControllerGuid(uint8_t* c) { return **reinterpret_cast<uint64_t**>(c + 8); }
++    uint32_t& Flags(uint8_t* m) { return *reinterpret_cast<uint32_t*>(m + ASC_OFF(0x44, 0x5C)); }
++    float* Pos(uint8_t* m) { return reinterpret_cast<float*>(m + ASC_OFF(0x10, 0x18)); }
++    float* Facing(uint8_t* m) { return reinterpret_cast<float*>(m + ASC_OFF(0x4C, 0x64)); }
++    uint8_t* Controller(uint8_t* m) { return *reinterpret_cast<uint8_t**>(m + ASC_OFF(0x144, 0x178)); }
++    uint64_t ControllerGuid(uint8_t* c) { return **reinterpret_cast<uint64_t**>(c + ASC_OFF(8, 0x10)); }
+ 
+     // Client calls (the original's pointer table 0x10bcbb84..0x10bcbbdc).
+     void ClearStep(uint8_t* m) { reinterpret_cast<void(__thiscall*)(uint8_t*, int)>(ASC_PTR(0x9881D0))(m, 0); }
+@@ -103,7 +103,7 @@ namespace
+         uint8_t* c = Controller(m);
+         if (c)
+         {
+-            const uint32_t kind = *reinterpret_cast<uint32_t*>(c + 0x14);
++            const uint32_t kind = *reinterpret_cast<uint32_t*>(c + ASC_OFF(0x14, 0x24));
+             if ((kind == 3 || kind == 4) && ControllerGuid(c))
+                 return ControllerGuid(c);
+         }
+diff --git a/src/Ascension/AscMysticEnchant.cpp b/src/Ascension/AscMysticEnchant.cpp
+index 44c10e1..449969f 100644
+--- a/src/Ascension/AscMysticEnchant.cpp
++++ b/src/Ascension/AscMysticEnchant.cpp
+@@ -226,11 +226,11 @@ namespace
+     bool IsStockClass(uint8_t c) { return (c >= 1 && c <= 9) || c == 11; }
+     // FUN_100C5F50: the Conquest of Azeroth classes.
+     bool IsCoAClass(uint8_t c) { return c >= 12 && c <= 32; }
+-    uint32_t UnitLevel(const uint8_t* unit) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0xD8); }
+-    uint32_t Coinage(const uint8_t* player) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + 8) + 0x1248); }
+-    bool Casting(const uint8_t* player) { return *reinterpret_cast<const uint32_t*>(player + 0xA60) != 0; }
+-    uint32_t EntryOf(const uint8_t* object) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(object + 8) + 0xC); }
+-    uint64_t GuidOf(const uint8_t* object) { return *reinterpret_cast<const uint64_t*>(*reinterpret_cast<uint8_t* const*>(object + 8)); }
++    uint32_t UnitLevel(const uint8_t* unit) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0xD8); }
++    uint32_t Coinage(const uint8_t* player) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0x1248); }
++    bool Casting(const uint8_t* player) { return *reinterpret_cast<const uint32_t*>(player + ASC_OFF(0xA60, 0x125C)) != 0; }
++    uint32_t EntryOf(const uint8_t* object) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(object + ASC_OFF(8, 0x10)) + 0xC); }
++    uint64_t GuidOf(const uint8_t* object) { return *reinterpret_cast<const uint64_t*>(*reinterpret_cast<uint8_t* const*>(object + ASC_OFF(8, 0x10))); }
+ 
+     // FUN_100A55D0: the item guid for a low guid (high 0x4000 << 16), 0 for 0.
+     uint64_t ItemGuid(uint32_t low) { return low ? (static_cast<uint64_t>(0x4000u << 16) << 32) | low : 0; }
+@@ -262,8 +262,8 @@ namespace
+     {
+         return reinterpret_cast<uint8_t*(__thiscall*)(void*, uint32_t)>(ASC_PTR(0x754390))(ContainerInventory(container), i);
+     }
+-    uint32_t ContainerSlots(uint8_t* container) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(container + 8) + 0x100); }
+-    uint64_t InvSlotGuid(const uint8_t* player, uint32_t slot) { return *reinterpret_cast<const uint64_t*>(*reinterpret_cast<uint8_t* const*>(player + 8) + 0x510 + slot * 8); }
++    uint32_t ContainerSlots(uint8_t* container) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(container + ASC_OFF(8, 0x10)) + 0x100); }
++    uint64_t InvSlotGuid(const uint8_t* player, uint32_t slot) { return *reinterpret_cast<const uint64_t*>(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0x510 + slot * 8); }
+ 
+     // FUN_10111D30 / FUN_10111E20: bag (0 = backpack, 1..4) and 1-based slot of an item the player holds.
+     void BagAndSlot(const uint8_t* item, uint8_t& bag, uint8_t& slot)
+@@ -336,7 +336,7 @@ namespace
+         for (uint32_t s = 0x76; s < 0x96; ++s)
+             if (uint8_t* it = static_cast<uint8_t*>(ObjectPtr(InvSlotGuid(unit, s), 2)))
+                 if (EntryOf(it) == item)
+-                    n += *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(it + 8) + 0x38);
++                    n += *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(it + ASC_OFF(8, 0x10)) + 0x38);
+         return count <= n;
+     }
+     // FUN_102EA1F0: {item, count} affordable -- the token slots first, else everything the player holds.
+@@ -347,7 +347,7 @@ namespace
+         uint32_t n = 0;
+         for (uint8_t* it : PlayerItems())
+             if (EntryOf(it) == item)
+-                n += *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(it + 8) + 0x38);
++                n += *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(it + ASC_OFF(8, 0x10)) + 0x38);
+         return count <= n;
+     }
+     // FUN_103085F0: free backpack slots plus free slots in equipped bags.
+@@ -630,7 +630,7 @@ namespace
+             const float dx = static_cast<float>(std::pow(static_cast<double>(q[0] - p[0]), 2.0));
+             const float dy = static_cast<float>(std::pow(static_cast<double>(q[1] - p[1]), 2.0));
+             const float d = static_cast<float>(std::sqrt(static_cast<double>(dy + dx + dz)));
+-            if (d <= 10.0f && *reinterpret_cast<const uint32_t*>(o + 0x14) == 5 && IsAltar(EntryOf(o)))
++            if (d <= 10.0f && *reinterpret_cast<const uint32_t*>(o + ASC_OFF(0x14, 0x24)) == 5 && IsAltar(EntryOf(o)))
+                 return true;
+         }
+         return false;
+diff --git a/src/Ascension/AscMysticEnchantPreset.cpp b/src/Ascension/AscMysticEnchantPreset.cpp
+index 8969059..e91ddec 100644
+--- a/src/Ascension/AscMysticEnchantPreset.cpp
++++ b/src/Ascension/AscMysticEnchantPreset.cpp
+@@ -63,10 +63,10 @@ namespace
+     {
+         if (!unit)
+             return 0;
+-        const uint32_t type = *reinterpret_cast<const uint32_t*>(unit + 0x14);
++        const uint32_t type = *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x14, 0x24));
+         if (type != 3 && type != 4)
+             return 0;
+-        return static_cast<uint8_t>(*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0x5C) >> 8);
++        return static_cast<uint8_t>(*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0x5C) >> 8);
+     }
+     bool CoAClass(const uint8_t* unit) { const uint8_t c = PlayerClass(unit); return c >= 12 && c <= 32; }   // FUN_100C5F50
+     bool Draft() { return AscGameMode::SpecBuildDraft(AscGameMode::ActiveSpecIndex()); }
+@@ -76,10 +76,10 @@ namespace
+         uint8_t* player = ActivePlayer();
+         if (!player)
+             return 0;
+-        auto count = [](const uint8_t* it) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + 8) + 0x38); };
+-        auto entry = [](const uint8_t* it) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + 8) + 0xC); };
++        auto count = [](const uint8_t* it) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0x38); };
++        auto entry = [](const uint8_t* it) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(it + ASC_OFF(8, 0x10)) + 0xC); };
+         uint32_t n = 0;
+-        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t**>(player + ASC_OFF(8, 0x10));
+         for (uint32_t s = 0x17; s < 0x27; ++s)
+             if (uint8_t* it = static_cast<uint8_t*>(ObjectPtr(*reinterpret_cast<const uint64_t*>(desc + 0x510 + s * 8), 2)))
+                 if (entry(it) == item)
+@@ -94,7 +94,7 @@ namespace
+             void* inv = (*reinterpret_cast<Inventory_t**>(container))[0x24 / 4](container);
+             if (!inv)
+                 continue;
+-            const uint32_t slots = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(container + 8) + 0x100);
++            const uint32_t slots = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(container + ASC_OFF(8, 0x10)) + 0x100);
+             for (uint32_t i = 0; i < slots; ++i)
+                 if (uint8_t* it = reinterpret_cast<uint8_t*(__thiscall*)(void*, uint32_t)>(ASC_PTR(0x754390))(inv, i))
+                     if (entry(it) == item)
+@@ -110,7 +110,7 @@ namespace
+             e.push_back(2);
+         if (const uint8_t* player = ActivePlayer())
+         {
+-            if (*reinterpret_cast<const uint32_t*>(player + 0xA60) != 0)
++            if (*reinterpret_cast<const uint32_t*>(player + ASC_OFF(0xA60, 0x125C)) != 0)
+                 e.push_back(3);
+             if (CoAClass(player))
+                 e.push_back(4);
+@@ -138,7 +138,7 @@ namespace
+             e.push_back(4);
+         if (const uint8_t* player = ActivePlayer())
+         {
+-            if (*reinterpret_cast<const uint32_t*>(player + 0xA60) != 0)
++            if (*reinterpret_cast<const uint32_t*>(player + ASC_OFF(0xA60, 0x125C)) != 0)
+                 e.push_back(5);
+             if (CoAClass(player))
+                 e.push_back(6);
+diff --git a/src/Ascension/AscNamePlates.cpp b/src/Ascension/AscNamePlates.cpp
+index c15a1b5..bc40581 100644
+--- a/src/Ascension/AscNamePlates.cpp
++++ b/src/Ascension/AscNamePlates.cpp
+@@ -116,12 +116,12 @@ namespace
+     // 0x722AE0(unit, descriptor +0x10C): the unit's model height.
+     float Height(uint8_t* unit)
+     {
+-        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + 8);
++        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+         return reinterpret_cast<float(__thiscall*)(void*, uint32_t)>(ASC_PTR(0x722AE0))(unit, *reinterpret_cast<const uint32_t*>(d + 0x10C));
+     }
+     uint32_t UnitFlags(const uint8_t* unit)     // descriptor +0xEC
+     {
+-        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + 8);
++        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+         return *reinterpret_cast<const uint32_t*>(d + 0xEC);
+     }
+     void SetAlpha(void* frame, uint32_t alpha) { reinterpret_cast<void(__thiscall*)(void*, uint32_t)>(ASC_PTR(0x48EA10))(frame, alpha); }
+@@ -331,7 +331,7 @@ namespace
+         if (!g_showNeutral && reinterpret_cast<int(__thiscall*)(void*, void*)>(ASC_PTR(0x7251C0))(player, unit) == 3 &&
+             ((UnitFlags(unit) >> 0x13) & 1) == 0)
+         {
+-            const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + 8);
++            const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+             if (!Equals(d, TargetGuid()))
+                 return 0;
+         }
+@@ -425,7 +425,7 @@ namespace
+     int __cdecl CollectPlate(uint32_t lo, uint32_t hi, const float* from)
+     {
+         uint8_t* unit = static_cast<uint8_t*>(ObjectPtr((static_cast<uint64_t>(hi) << 32) | lo, 0x18));
+-        if (unit && *reinterpret_cast<const uint32_t*>(unit + 0xC38) != 0)
++        if (unit && *reinterpret_cast<const uintptr_t*>(unit + ASC_OFF(0xC38, 0x1470)) != 0)
+         {
+             float at[3];
+             Position(unit, at);
+@@ -434,7 +434,7 @@ namespace
+             o.unused = 0;
+             o.guidLo = lo;
+             o.guidHi = hi;
+-            o.plate = *reinterpret_cast<void* const*>(unit + 0xC38);
++            o.plate = *reinterpret_cast<void* const*>(unit + ASC_OFF(0xC38, 0x1470));
+             o.unused2 = 0;
+             g_order.push_back(o);
+         }
+@@ -496,7 +496,7 @@ namespace
+         AscScript::EnumObjects(&CollectUnit, nullptr);
+         for (uint8_t* unit : g_units)
+         {
+-            if (!Equals(*reinterpret_cast<uint8_t* const*>(unit + 8), guid))
++            if (!Equals(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)), guid))
+                 continue;
+             for (auto& kv : g_plates)
+                 if (kv.second->unit == unit)
+@@ -504,7 +504,7 @@ namespace
+                     PlateEntry* e = g_plates[kv.first];
+                     if (!e)
+                         return 0;
+-                    uint8_t* plate = *reinterpret_cast<uint8_t* const*>(e->unit + 0xC38);
++                    uint8_t* plate = *reinterpret_cast<uint8_t* const*>(e->unit + ASC_OFF(0xC38, 0x1470));
+                     if (!plate)
+                         return 0;
+                     if (*reinterpret_cast<const uint32_t*>(plate + 4) == 0)
+@@ -549,7 +549,7 @@ namespace
+         PlateEntry* e = PlateForToken(token);
+         if (e && e->unit)
+         {
+-            *guid = *reinterpret_cast<const uint64_t*>(*reinterpret_cast<uint8_t* const*>(e->unit + 8));
++            *guid = *reinterpret_cast<const uint64_t*>(*reinterpret_cast<uint8_t* const*>(e->unit + ASC_OFF(8, 0x10)));
+             return 1;
+         }
+         return g_tokenGuid(token, guid, a3);
+diff --git a/src/Ascension/AscPatchData.cpp b/src/Ascension/AscPatchData.cpp
+index f89d804..8af76ec 100644
+--- a/src/Ascension/AscPatchData.cpp
++++ b/src/Ascension/AscPatchData.cpp
+@@ -180,7 +180,7 @@ namespace
+     // the flags CGxTexFlags(3, 1, 1, 0, 0, 0, 1, 0, 0, 0) (0x681BE0) and status 0xAF5718.
+     void RefreshGameObjectTexture(uint8_t* go)
+     {
+-        const uint8_t* display = *reinterpret_cast<uint8_t* const*>(go + 0x1A4);
++        const uint8_t* display = *reinterpret_cast<uint8_t* const*>(go + ASC_OFF(0x1A4, 0x2E8));
+         if (!display)
+             return;
+         AscDbc::Table& t = AscDbc::Get("DBFilesClient/GameObjectDisplayInfoAddon.dbc");
+@@ -193,7 +193,7 @@ namespace
+             &flagsObj, 3, 1, 1, 0, 0, 0, 1, 0, 0, 0);
+         void* tex = reinterpret_cast<void*(__cdecl*)(const char*, uint32_t, void*, int)>(ASC_PTR(0x4B9760))(name, *flags, reinterpret_cast<void*>(ASC_PTR(0xAF5718)), 0);
+         if (tex)
+-            reinterpret_cast<void(__thiscall*)(void*, int, void*)>(ASC_PTR(0x825260))(*reinterpret_cast<void**>(go + 0xB4), 2, tex);
++            reinterpret_cast<void(__thiscall*)(void*, int, void*)>(ASC_PTR(0x825260))(*reinterpret_cast<void**>(go + ASC_OFF(0xB4, 0x138)), 2, tex);
+     }
+     int __cdecl RefreshEachGameObject(uint32_t lo, uint32_t hi, void*)   // LAB_1020c030
+     {
+@@ -209,7 +209,7 @@ namespace
+     GoFn_t g_713F50 = nullptr, g_712400 = nullptr;
+     int __fastcall Hook713F50(uint8_t* go ASC_EDX_P(void* edx), uintptr_t model)
+     {
+-        AscCrashContext::g_gameObjectEntry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(go + 8) + 0xC);
++        AscCrashContext::g_gameObjectEntry = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(go + ASC_OFF(8, 0x10)) + 0xC);
+         const uint8_t* shared = *reinterpret_cast<uint8_t* const*>(reinterpret_cast<const uint8_t*>(model) + 0x2C);
+         AscCrashContext::g_gameObjectModel = shared ? reinterpret_cast<const char*>(shared + 0x3C) : "Unknown (Missing CM2Shared)";
+         const int r = g_713F50(go ASC_EDX_A(edx), model);
+diff --git a/src/Ascension/AscQuestSpellHide.cpp b/src/Ascension/AscQuestSpellHide.cpp
+index 30b8d3e..472317a 100644
+--- a/src/Ascension/AscQuestSpellHide.cpp
++++ b/src/Ascension/AscQuestSpellHide.cpp
+@@ -20,7 +20,7 @@ namespace
+ 
+     bool __cdecl RemoveEffect(void*, void* effect)   // 0x10112650
+     {
+-        return HiddenSpell(*reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(effect) + 0x18));
++        return HiddenSpell(*reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(effect) + ASC_OFF(0x18, 0x20)));
+     }
+ 
+     bool __cdecl HideVisual(uint32_t, uint32_t, uint32_t, uint32_t spell)   // 0x10112640
+diff --git a/src/Ascension/AscRuntime.cpp b/src/Ascension/AscRuntime.cpp
+index b8c4e58..94f81aa 100644
+--- a/src/Ascension/AscRuntime.cpp
++++ b/src/Ascension/AscRuntime.cpp
+@@ -234,7 +234,7 @@ namespace
+             uint8_t* unit = static_cast<uint8_t*>(AscScript::ObjectPtr(AscX64::Guid(lo, hi), 8));
+             if (unit)
+             {
+-                const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(unit + 8);
++                const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+                 if (!(desc[8] & 0x10) && *reinterpret_cast<const uint32_t*>(desc + 0x10C) != *reinterpret_cast<const uint32_t*>(desc + 0x110))
+                     if (void* rec = reinterpret_cast<void*(__thiscall*)(void*)>(ASC_PTR(0x616B10))(unit))
+                         if (uint8_t* e = reinterpret_cast<uint8_t*(__thiscall*)(void*, void*, int)>(ASC_PTR(0x6F6020))(reinterpret_cast<void*>(ASC_PTR(0xC5CE30)), rec, 0))
+@@ -252,13 +252,13 @@ namespace
+ 
+     // 0x6ECF80 (__thiscall, 7 stack arguments, ret 0x1C; 6 bytes). The original's detour 0x102762B0 (hook
+     // object 0x10BCB650) runs list 0x10BE2BAC (FUN_10278660) with the object's +0x144, then the original.
+-    std::vector<void (*)(uint32_t)>& Before6ECF80List() { static std::vector<void (*)(uint32_t)> v; return v; }
++    std::vector<void (*)(uintptr_t)>& Before6ECF80List() { static std::vector<void (*)(uintptr_t)> v; return v; }
+     typedef int(__fastcall* Fn6ECF80_t)(void* ASC_EDX_P(void*), uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+     Fn6ECF80_t g_6ECF80Trampoline = nullptr;
+     int __fastcall Detour6ECF80(void* self ASC_EDX_P(void* edx), uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t g)
+     {
+         for (auto cb : Before6ECF80List())
+-            cb(*reinterpret_cast<const uint32_t*>(static_cast<uint8_t*>(self) + 0x144));
++            cb(*reinterpret_cast<const uintptr_t*>(static_cast<uint8_t*>(self) + ASC_OFF(0x144, 0x178)));
+         return g_6ECF80Trampoline(self ASC_EDX_A(edx), a, b, c, d, e, f, g);
+     }
+ 
+@@ -312,10 +312,10 @@ namespace
+     // Every effect of the unit's chain, the next one read before the callbacks run.
+     void FilterEffects(void* unit)
+     {
+-        uint8_t* effect = *reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(unit) + 0xA8);
++        uint8_t* effect = *reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(unit) + ASC_OFF(0xA8, 0x120));
+         while (effect)
+         {
+-            uint8_t* next = *reinterpret_cast<uint8_t**>(effect + 0x108);
++            uint8_t* next = *reinterpret_cast<uint8_t**>(effect + ASC_OFF(0x108, 0x178));
+             for (auto& cb : EffectFilterList())
+                 if (cb.second(unit, effect))
+                 {
+@@ -336,10 +336,10 @@ namespace
+             FilterEffects(unit);
+             return;
+         }
+-        while (uint8_t* effect = *reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(unit) + 0xA8))
++        while (uint8_t* effect = *reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(unit) + ASC_OFF(0xA8, 0x120)))
+         {
+             reinterpret_cast<void(__thiscall*)(void*)>(ASC_PTR(0x6F74B0))(effect);
+-            if (*reinterpret_cast<int32_t*>(effect + 0x24) == -1 && *reinterpret_cast<uint32_t*>(effect + 0xCC) != 0)
++            if (*reinterpret_cast<int32_t*>(effect + ASC_OFF(0x24, 0x38)) == -1 && *reinterpret_cast<uint32_t*>(effect + ASC_OFF(0xCC, 0x12C)) != 0)
+                 reinterpret_cast<void(__thiscall*)(void*)>(ASC_PTR(0x6F7A00))(effect);
+             else
+                 reinterpret_cast<void(__thiscall*)(void*)>(ASC_PTR(0x6FA390))(effect);
+@@ -548,7 +548,7 @@ namespace
+     {
+         if (!unit)
+             return;
+-        memset(unit + 0xF20, 0, 0x28);
++        memset(unit + ASC_OFF(0xF20, 0x1770), 0, 0x28);
+         g_auraTypes[unit].fill(0);
+         uint8_t rec[0x2A8] = {};
+         const uint32_t n = reinterpret_cast<uint32_t(__thiscall*)(uint8_t*)>(ASC_PTR(0x4F8850))(unit);
+@@ -584,7 +584,7 @@ namespace
+         const int r = g_730290Trampoline(unit ASC_EDX_A(edx), a);
+         if (!unit)
+             return r;
+-        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + 8);
++        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+         if ((d[8] & 0x10) || *reinterpret_cast<const uint32_t*>(d + 0x10C) == *reinterpret_cast<const uint32_t*>(d + 0x110))
+             return r;
+         if (void* v = reinterpret_cast<void*(__thiscall*)(uint8_t*)>(ASC_PTR(0x616B10))(unit))
+@@ -809,7 +809,7 @@ void OnAfter743EC0(ObjectCallback cb) { After743EC0List().push_back(cb); }
+ void OnBeforeTargetChange(Callback cb) { BeforeTargetList().push_back(cb); }
+ void OnAfter52A980(Callback cb) { After52A980List().push_back(cb); }
+ void OnAfterTargetChange(Callback cb) { AfterTargetList().push_back(cb); }
+-void OnBefore6ECF80(void (*cb)(uint32_t)) { Before6ECF80List().push_back(cb); }
++void OnBefore6ECF80(void (*cb)(uintptr_t)) { Before6ECF80List().push_back(cb); }
+ void OnBefore724820(UnitSpellVeto cb, uint32_t site)
+ {
+     // Closed native list 0x10BE2B6C: AscAura137::BeforeApply, AscSpellVisuals::BeforeAuraApply,
+diff --git a/src/Ascension/AscRuntime.hpp b/src/Ascension/AscRuntime.hpp
+index be37ada..33d2249 100644
+--- a/src/Ascension/AscRuntime.hpp
++++ b/src/Ascension/AscRuntime.hpp
+@@ -111,7 +111,7 @@ namespace AscRuntime
+     void OnAfter52A980(Callback cb);
+     void OnAfterTargetChange(Callback cb);
+     // FUN_10278660 -> list 0x10BE2BAC: run with the object's +0x144 before client 0x6ECF80 (detour 0x102762B0).
+-    void OnBefore6ECF80(void (*cb)(uint32_t));
++    void OnBefore6ECF80(void (*cb)(uintptr_t));
+     // Veto lists over three spell/aura paths. Each callback returns false to stop: the rest are skipped
+     // and so is (or, for 0x80B5D0, the result becomes false instead of) the client function.
+     //   FUN_10278430 -> list 0x10BE2B6C, the detour 0x10275F60 over 0x724820 (__thiscall(unit, a, b), ret 8),
+diff --git a/src/Ascension/AscSceneTransform.cpp b/src/Ascension/AscSceneTransform.cpp
+index 22e7622..2e59772 100644
+--- a/src/Ascension/AscSceneTransform.cpp
++++ b/src/Ascension/AscSceneTransform.cpp
+@@ -32,7 +32,7 @@ namespace
+     int __fastcall Hook95EED0(uint8_t* self ASC_EDX_P(void* edx))
+     {
+         float q[4];
+-        reinterpret_cast<void(__thiscall*)(uint8_t*, float*)>(ASC_PTR(0x489230))(self + 0x20, q);
++        reinterpret_cast<void(__thiscall*)(uint8_t*, float*)>(ASC_PTR(0x489230))(self + ASC_OFF(0x20, 0x38), q);
+         g_kept[0] = F1(q[0]);
+         g_kept[1] = F2(q[1]);
+         g_kept[2] = F1(q[2]);
+diff --git a/src/Ascension/AscScrollOfFortune.cpp b/src/Ascension/AscScrollOfFortune.cpp
+index f9f780c..4dcdaea 100644
+--- a/src/Ascension/AscScrollOfFortune.cpp
++++ b/src/Ascension/AscScrollOfFortune.cpp
+@@ -174,14 +174,14 @@ namespace
+         uint8_t* player = ActivePlayer();
+         if (!player)
+             return 0;
+-        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(player + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10));
+         if (*reinterpret_cast<const uint64_t*>(desc) != ActivePlayerGuid())
+             return 0;
+         uint32_t total = 0;
+         for (uint32_t i = 0x76; i < 0x96; ++i)
+             if (const uint8_t* item = static_cast<const uint8_t*>(ObjectPtr(*reinterpret_cast<const uint64_t*>(desc + 0x510 + i * 8), 2)))
+             {
+-                const uint8_t* idesc = *reinterpret_cast<uint8_t* const*>(item + 8);
++                const uint8_t* idesc = *reinterpret_cast<uint8_t* const*>(item + ASC_OFF(8, 0x10));
+                 if (*reinterpret_cast<const uint32_t*>(idesc + 0xC) == entry)
+                     total += *reinterpret_cast<const uint32_t*>(idesc + 0x38);
+             }
+@@ -207,7 +207,7 @@ namespace
+         for (const Reward* r : recs)
+         {
+             if (uint8_t* player = ActivePlayer())
+-                if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + 8) + 0xD8) < r->level)
++                if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0xD8) < r->level)
+                     return 6;
+             if (now < static_cast<__time64_t>(r->release))
+                 return 7;
+diff --git a/src/Ascension/AscSkillCardCollection.cpp b/src/Ascension/AscSkillCardCollection.cpp
+index a56d946..1b1e1c0 100644
+--- a/src/Ascension/AscSkillCardCollection.cpp
++++ b/src/Ascension/AscSkillCardCollection.cpp
+@@ -101,7 +101,7 @@ namespace
+     uint32_t Money()   // player +0x1248
+     {
+         uint8_t* p = ActivePlayer();
+-        return p ? *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(p + 8) + 0x1248) : 0;
++        return p ? *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) + 0x1248) : 0;
+     }
+ 
+     uint8_t PlayerClass()   // FUN_100a0390: the unit's class byte (+0x5D) for a player / unit
+@@ -109,10 +109,10 @@ namespace
+         uint8_t* p = ActivePlayer();
+         if (!p)
+             return 0;
+-        const uint32_t t = *reinterpret_cast<const uint32_t*>(p + 0x14);
++        const uint32_t t = *reinterpret_cast<const uint32_t*>(p + ASC_OFF(0x14, 0x24));
+         if (t != 3 && t != 4)
+             return 0;
+-        return *(*reinterpret_cast<uint8_t**>(p + 8) + 0x5D);
++        return *(*reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) + 0x5D);
+     }
+ 
+     // ---- the cards --------------------------------------------------------------------------------
+diff --git a/src/Ascension/AscSkillCardSlots.cpp b/src/Ascension/AscSkillCardSlots.cpp
+index 05fd34f..717b056 100644
+--- a/src/Ascension/AscSkillCardSlots.cpp
++++ b/src/Ascension/AscSkillCardSlots.cpp
+@@ -69,7 +69,7 @@ namespace
+             uint8_t* p = ActivePlayer();
+             if (!p)
+                 return true;
+-            if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(p + 8) + 0xD8) < kLevels[i])
++            if (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) + 0xD8) < kLevels[i])
+                 return true;
+         }
+         return false;
+diff --git a/src/Ascension/AscSmallHooks.cpp b/src/Ascension/AscSmallHooks.cpp
+index f9e4b2e..2b710f1 100644
+--- a/src/Ascension/AscSmallHooks.cpp
++++ b/src/Ascension/AscSmallHooks.cpp
+@@ -60,14 +60,14 @@ namespace
+     int __fastcall Hook6E09E0(uint8_t* unit ASC_EDX_P(void* edx))   // FUN_102cac10
+     {
+         const int r = Original6E09E0(unit ASC_EDX_A(edx));
+-        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + 8);
++        const uint8_t* d = *reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10));
+         const uint32_t lo = *reinterpret_cast<const uint32_t*>(d + 0x598), hi = *reinterpret_cast<const uint32_t*>(d + 0x59C);
+         if (!lo && !hi)
+             return r;
+         void* item = static_cast<void*>(AscScript::ObjectPtr(AscX64::Guid(lo, hi), 2));
+         if (!item || !reinterpret_cast<int(__thiscall*)(void*)>(ASC_PTR(0x707330))(item))
+             return r;
+-        const uint32_t kind = *reinterpret_cast<const uint32_t*>(unit + 0x14);
++        const uint32_t kind = *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0x14, 0x24));
+         const uint8_t state = (kind == 3 || kind == 4) ? d[0x1E8] : 0;
+         reinterpret_cast<void(__thiscall*)(uint8_t*, int, void*)>(ASC_PTR(0x72B7F0))(unit, state != 2, nullptr);
+         return r;
+@@ -137,7 +137,7 @@ namespace
+         const uint8_t* player = AscScript::ActivePlayer();
+         if (!player)
+             return 0;
+-        const uint32_t castEnd = *reinterpret_cast<const uint32_t*>(player + 0xA7C);
++        const uint32_t castEnd = *reinterpret_cast<const uint32_t*>(player + ASC_OFF(0xA7C, 0x127C));
+         if (!castEnd)
+             return 0;
+         const uint32_t ms = g_spellQueueWindow ? *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(g_spellQueueWindow) + 0x30) : 0;
+diff --git a/src/Ascension/AscSpawnVisibility.cpp b/src/Ascension/AscSpawnVisibility.cpp
+index 70bd14a..f52d593 100644
+--- a/src/Ascension/AscSpawnVisibility.cpp
++++ b/src/Ascension/AscSpawnVisibility.cpp
+@@ -101,7 +101,7 @@ namespace
+         if (*reinterpret_cast<const uint32_t*>(rec) != 0x16E59)
+             return true;
+         const uint8_t* o = static_cast<const uint8_t*>(object);
+-        const uint32_t* desc = *reinterpret_cast<uint32_t* const*>(o + 8);
++        const uint32_t* desc = *reinterpret_cast<uint32_t* const*>(o + ASC_OFF(8, 0x10));
+         const uint32_t lo = desc[0], hi = desc[1];
+         uint32_t counter = lo;
+         if (hi >= 0x10000000)
+diff --git a/src/Ascension/AscSpellMods.cpp b/src/Ascension/AscSpellMods.cpp
+index 5f1212b..e2b22d1 100644
+--- a/src/Ascension/AscSpellMods.cpp
++++ b/src/Ascension/AscSpellMods.cpp
+@@ -62,7 +62,7 @@ namespace
+     uint32_t U32(const void* p, uint32_t off) { return *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(p) + off); }
+     int32_t I32(const void* p, uint32_t off) { return *reinterpret_cast<const int32_t*>(static_cast<const uint8_t*>(p) + off); }
+     uint8_t* ActivePlayer() { return reinterpret_cast<uint8_t*(__cdecl*)()>(ASC_PTR(0x4038F0))(); }
+-    const uint8_t* Descriptor(const void* object) { return *reinterpret_cast<uint8_t* const*>(static_cast<const uint8_t*>(object) + 8); }
++    const uint8_t* Descriptor(const void* object) { return *reinterpret_cast<uint8_t* const*>(static_cast<const uint8_t*>(object) + ASC_OFF(8, 0x10)); }
+     uint64_t Guid(const void* object) { const uint8_t* d = Descriptor(object); return U32(d, 0) | static_cast<uint64_t>(U32(d, 4)) << 32; }
+     uint32_t PendingSpell() { return *reinterpret_cast<const uint32_t*>(ASC_PTR(0xD397D0)); }   // *DAT_10BCC4B0
+ 
+diff --git a/src/Ascension/AscSpellText.cpp b/src/Ascension/AscSpellText.cpp
+index a8478bf..363bba0 100644
+--- a/src/Ascension/AscSpellText.cpp
++++ b/src/Ascension/AscSpellText.cpp
+@@ -246,7 +246,7 @@ namespace
+         if (const uint32_t pct = RecU32(rec, 0x230))   // a percentage of UNIT_FIELD_BASE_MANA
+         {
+             const uint8_t* player = ActivePlayer();
+-            cost = player ? (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + 8) + 0x1E0) * pct) / 100 : 0;
++            cost = player ? (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0x1E0) * pct) / 100 : 0;
+         }
+         std::string name = "UNKNOWN POWER";
+         switch (static_cast<int32_t>(RecU32(rec, 0xA4)))
+diff --git a/src/Ascension/AscSpellTokens.cpp b/src/Ascension/AscSpellTokens.cpp
+index cb10d07..7286043 100644
+--- a/src/Ascension/AscSpellTokens.cpp
++++ b/src/Ascension/AscSpellTokens.cpp
+@@ -33,7 +33,7 @@ namespace
+     uint32_t U32(const void* p, uint32_t off) { return *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(p) + off); }
+     int32_t I32(const void* p, uint32_t off) { return *reinterpret_cast<const int32_t*>(static_cast<const uint8_t*>(p) + off); }
+     float F32(const void* p, uint32_t off) { return *reinterpret_cast<const float*>(static_cast<const uint8_t*>(p) + off); }
+-    const uint8_t* Descriptor(const uint8_t* object) { return *reinterpret_cast<uint8_t* const*>(object + 8); }
++    const uint8_t* Descriptor(const uint8_t* object) { return *reinterpret_cast<uint8_t* const*>(object + ASC_OFF(8, 0x10)); }
+ 
+     typedef int(__cdecl* Fn3_t)(uint32_t, uint32_t, const uint8_t*);
+     // 0x5782D0 is __fastcall: ecx / edx carry the client's own state, then eight stack arguments (ret 0x20).
+diff --git a/src/Ascension/AscSpellVisuals.cpp b/src/Ascension/AscSpellVisuals.cpp
+index d243cf4..d548992 100644
+--- a/src/Ascension/AscSpellVisuals.cpp
++++ b/src/Ascension/AscSpellVisuals.cpp
+@@ -40,7 +40,7 @@ namespace
+     std::unordered_map<uint32_t, std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t>>> g_visuals;   // 0x10BE447C
+ 
+     uint32_t U32(const void* p, uint32_t off) { return *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(p) + off); }
+-    const uint8_t* Descriptor(const void* object) { return *reinterpret_cast<uint8_t* const*>(static_cast<const uint8_t*>(object) + 8); }
++    const uint8_t* Descriptor(const void* object) { return *reinterpret_cast<uint8_t* const*>(static_cast<const uint8_t*>(object) + ASC_OFF(8, 0x10)); }
+     uint64_t Guid64(uint32_t lo, uint32_t hi) { return lo | static_cast<uint64_t>(hi) << 32; }
+     uint64_t DescGuid(const uint8_t* desc, uint32_t off) { return Guid64(U32(desc, off), U32(desc, off + 4)); }
+     uint64_t ActiveGuid() { return AscScript::ActivePlayerGuid(); }
+diff --git a/src/Ascension/AscTooltipScaling.cpp b/src/Ascension/AscTooltipScaling.cpp
+index f350052..bf354f3 100644
+--- a/src/Ascension/AscTooltipScaling.cpp
++++ b/src/Ascension/AscTooltipScaling.cpp
+@@ -75,7 +75,7 @@ namespace
+     typedef uint8_t*(__cdecl* ObjectByGuid_t)(uint32_t lo, uint32_t hi, uint32_t typeMask);
+     const ObjectByGuid_t ObjectByGuid = [](uint32_t lo, uint32_t hi, uint32_t m) -> uint8_t* { return static_cast<uint8_t*>(AscScript::ObjectPtr(AscX64::Guid(lo, hi), m)); };   // 0x4D4DB0 (x64: WOWGUID + arquivo/linha)
+     uint8_t* ActivePlayer() { return reinterpret_cast<uint8_t*(__cdecl*)()>(ASC_PTR(0x4038F0))(); }
+-    uint32_t UnitLevel(const uint8_t* unit) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + 8) + 0xD8); }
++    uint32_t UnitLevel(const uint8_t* unit) { return *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(unit + ASC_OFF(8, 0x10)) + 0xD8); }
+ 
+     typedef const uint8_t*(__thiscall* CacheGet_t)(void*, uint32_t, void*, void*, void*, int);
+     const uint8_t* ItemCache(uint32_t item)
+@@ -293,7 +293,7 @@ namespace
+             Patch62B98F(false);
+         if (g_compare)
+             Patch631760(false);
+-        if (!RealmInfoSvc::Get().Dev() && g_itemCache && *reinterpret_cast<const uint32_t*>(g_itemCache + 0x14) == 4)
++        if (!RealmInfoSvc::Get().Dev() && g_itemCache && *reinterpret_cast<const uint32_t*>(g_itemCache + ASC_OFF(0x14, 0x18)) == 4)
+         {
+             const uint32_t cap = AscGameEvents::ServerMaxLevel();
+             const uint32_t required = *reinterpret_cast<const uint32_t*>(g_itemCache + 0x38);
+@@ -354,7 +354,7 @@ namespace
+     // and the store has it, else the cache image.
+     void CompareRecord(uint32_t out[0x2A], const uint8_t* object)
+     {
+-        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(object + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(object + ASC_OFF(8, 0x10));
+         const uint32_t entry = *reinterpret_cast<const uint32_t*>(desc + 0xC);
+         const uint32_t level = ItemLevelOf(Guid(desc));
+         if (level)
+@@ -401,10 +401,10 @@ namespace
+     // The player's class (UNIT_FIELD_BYTES_0 byte 1), 0 unless the object is a unit / player (+0x14 3 / 4).
+     uint32_t PlayerClass(const uint8_t* player)
+     {
+-        const uint32_t type = *reinterpret_cast<const uint32_t*>(player + 0x14);
++        const uint32_t type = *reinterpret_cast<const uint32_t*>(player + ASC_OFF(0x14, 0x24));
+         if (type != 3 && type != 4)
+             return 0;
+-        return (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + 8) + 0x5C) >> 8) & 0xFF;
++        return (*reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0x5C) >> 8) & 0xFF;
+     }
+     bool StockClass(const uint8_t* player)   // FUN_100c6380
+     {
+@@ -472,11 +472,11 @@ namespace
+     {
+         if (const uint8_t* r = ScaledRecord())
+             damage = AverageDamage(r);
+-        const uint32_t subclass = *reinterpret_cast<const uint32_t*>(item + 0x28);
+-        if (*reinterpret_cast<const uint32_t*>(item + 4) == 2 &&
++        const uint32_t subclass = *reinterpret_cast<const uint32_t*>(item + ASC_OFF(0x28, 0x2C));
++        if (*reinterpret_cast<const uint32_t*>(item + ASC_OFF(4, 8)) == 2 &&
+             (subclass == 0xD || subclass == 0x11 || subclass == 0x15 || subclass == 0x16))
+         {
+-            const float delay = static_cast<float>(UintToDouble(*reinterpret_cast<const uint32_t*>(item + 0xF4))) / 1000.0f;
++            const float delay = static_cast<float>(UintToDouble(*reinterpret_cast<const uint32_t*>(item + ASC_OFF(0xF4, 0xF8)))) / 1000.0f;
+             const float dps = damage / delay;
+             const float low = (dps - 30.0f) * 8.0f;
+             const float high = (dps - 54.81f) * 14.0f + 200.0f;
+@@ -492,7 +492,7 @@ namespace
+     // ---- 0x708540: repair cost (__thiscall on the item object; replaced) ----------------------------------------
+     uint32_t __fastcall RepairCost(uint8_t* item ASC_EDX_P(void*))
+     {
+-        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(item + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(item + ASC_OFF(8, 0x10));
+         const uint8_t* c = ItemCache(*reinterpret_cast<const uint32_t*>(desc + 0xC));
+         if (!c)
+             return 0;
+@@ -546,10 +546,10 @@ namespace
+         if (result == 0)
+         {
+             const uint8_t* player = ActivePlayer();
+-            const uint32_t required = *reinterpret_cast<const uint32_t*>(item + 0x38);
++            const uint32_t required = *reinterpret_cast<const uint32_t*>(item + ASC_OFF(0x38, 0x3C));
+             if (player && required > 1 && UnitLevel(player) < required && g_lastItemObject)
+             {
+-                const uint32_t level = ItemLevelOf(Guid(*reinterpret_cast<uint8_t* const*>(g_lastItemObject + 8)));
++                const uint32_t level = ItemLevelOf(Guid(*reinterpret_cast<uint8_t* const*>(g_lastItemObject + ASC_OFF(8, 0x10))));
+                 if (level != 0 && level - 5 <= UnitLevel(player))
+                     result = 1;
+             }
+@@ -612,7 +612,7 @@ namespace
+         AscLua::lua_settop(L, -2);
+         typedef bool(__thiscall* IsA_t)(void*, uint32_t);
+         const uint32_t type = reinterpret_cast<uint32_t(__cdecl*)()>(ASC_PTR(0x514410))();
+-        if (!(*reinterpret_cast<IsA_t*>(*static_cast<uint8_t**>(obj) + 0x10))(obj, type))
++        if (!(*reinterpret_cast<IsA_t*>(*static_cast<uint8_t**>(obj) + ASC_OFF(0x10, 0x20)))(obj, type))
+             return nullptr;
+         if (!AscLua::lua_isstring(L, 2))
+             return nullptr;
+@@ -1077,7 +1077,7 @@ namespace
+             const std::string armor = GlobalString("ARMOR");
+             const bool green = *color == 0xFF1EFF00 || *color == 0xFF00FF00;
+             const bool rewrite = !green || (armor == name && g_rewriteFirst);
+-            if (g_itemCache && *reinterpret_cast<const uint32_t*>(g_itemCache + 0x14) != 7 && rewrite)
++            if (g_itemCache && *reinterpret_cast<const uint32_t*>(g_itemCache + ASC_OFF(0x14, 0x18)) != 7 && rewrite)
+             {
+                 if (ScaledStat(name, &value))
+                 {
+diff --git a/src/Ascension/AscTutorial.cpp b/src/Ascension/AscTutorial.cpp
+index 032662b..d9639a6 100644
+--- a/src/Ascension/AscTutorial.cpp
++++ b/src/Ascension/AscTutorial.cpp
+@@ -59,8 +59,8 @@ namespace
+         if (!p.obj)
+             return p;
+         p.present = true;
+-        const uint8_t* desc = *reinterpret_cast<uint8_t**>(p.obj + 8);
+-        const int32_t type = *reinterpret_cast<const int32_t*>(p.obj + 0x14);
++        const uint8_t* desc = *reinterpret_cast<uint8_t**>(p.obj + ASC_OFF(8, 0x10));
++        const int32_t type = *reinterpret_cast<const int32_t*>(p.obj + ASC_OFF(0x14, 0x24));
+         if (type == 3 || type == 4)
+         {
+             p.race = desc[0x5C];
+diff --git a/src/Ascension/AscUnitSelect.cpp b/src/Ascension/AscUnitSelect.cpp
+index 97ba006..dab5d6f 100644
+--- a/src/Ascension/AscUnitSelect.cpp
++++ b/src/Ascension/AscUnitSelect.cpp
+@@ -175,7 +175,7 @@ namespace
+ 
+     typedef uint8_t*(__cdecl* ObjectPtr_t)(uint32_t, uint32_t, uint32_t);
+     uint8_t* ObjectPtr(uint32_t lo, uint32_t hi, uint32_t mask) { return static_cast<uint8_t*>(AscScript::ObjectPtr(AscX64::Guid(lo, hi), mask)); }   // 0x4D4DB0
+-    const uint8_t* Fields(const uint8_t* object) { return *reinterpret_cast<const uint8_t* const*>(object + 8); }
++    const uint8_t* Fields(const uint8_t* object) { return *reinterpret_cast<const uint8_t* const*>(object + ASC_OFF(8, 0x10)); }
+     bool SameGuid(const uint8_t* a, const uint8_t* b)
+     {
+         return reinterpret_cast<const uint32_t*>(a)[0] == reinterpret_cast<const uint32_t*>(b)[0] &&
+@@ -277,7 +277,7 @@ namespace
+         uint8_t* player = AscScript::ActivePlayer();
+         if (!player)
+             return;
+-        const uint32_t spell = *reinterpret_cast<const uint32_t*>(unit + 0xA6C);
++        const uint32_t spell = *reinterpret_cast<const uint32_t*>(unit + ASC_OFF(0xA6C, 0x1268));
+         if (!spell)
+             return;
+         uint8_t rec[0x2A8];
+@@ -351,7 +351,7 @@ namespace
+             return;
+         g_questEntries.push_back(entry);   // pushed again even when already cached
+         uint32_t colour = 0x32FFD200;
+-        const float r = *reinterpret_cast<const float*>(unit + 0xB0C);
++        const float r = *reinterpret_cast<const float*>(unit + ASC_OFF(0xB0C, 0x1324));
+         if (*reinterpret_cast<const uint32_t*>(ASC_PTR(0xAC80A8)) == 0)
+             return;
+         float matrix[16];
+diff --git a/src/Ascension/AscWildcardRolls.cpp b/src/Ascension/AscWildcardRolls.cpp
+index ababd06..e5d060b 100644
+--- a/src/Ascension/AscWildcardRolls.cpp
++++ b/src/Ascension/AscWildcardRolls.cpp
+@@ -65,7 +65,7 @@ namespace
+         uint8_t* p = ActivePlayer();
+         if (!p)
+             return false;
+-        const uint32_t lvl = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(p + 8) + 0xD8);
++        const uint32_t lvl = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) + 0xD8);
+         if (lvl >= AscGameEvents::ServerMaxLevel())
+             return true;
+         return RealmInfoSvc::Get().Dev() && (lvl == 0x3C || lvl == 0x46 || lvl == 0x50);
+@@ -77,12 +77,12 @@ namespace
+         uint8_t* player = ActivePlayer();
+         if (!player)
+             return 0;
+-        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(player + 8);
++        const uint8_t* desc = *reinterpret_cast<uint8_t* const*>(player + ASC_OFF(8, 0x10));
+         uint32_t total = 0;
+         for (uint32_t i = 0x76; i < 0x96; ++i)
+             if (const uint8_t* item = static_cast<const uint8_t*>(ObjectPtr(*reinterpret_cast<const uint64_t*>(desc + 0x510 + i * 8), 2)))
+             {
+-                const uint8_t* idesc = *reinterpret_cast<uint8_t* const*>(item + 8);
++                const uint8_t* idesc = *reinterpret_cast<uint8_t* const*>(item + ASC_OFF(8, 0x10));
+                 if (*reinterpret_cast<const uint32_t*>(idesc + 0xC) == entry)
+                     total += *reinterpret_cast<const uint32_t*>(idesc + 0x38);
+             }
+@@ -116,7 +116,7 @@ namespace
+             return CountItem(0x5B9D2) < count * price ? 9 : 0;
+         if (!player)
+             return 10;
+-        const uint32_t money = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(player + 8) + 0x1248);
++        const uint32_t money = *reinterpret_cast<const uint32_t*>(*reinterpret_cast<uint8_t**>(player + ASC_OFF(8, 0x10)) + 0x1248);
+         return money < count * price ? 10 : 0;
+     }
+ 
+diff --git a/src/Ascension/AscWorldEntryTweaks.cpp b/src/Ascension/AscWorldEntryTweaks.cpp
+index a1e3938..945ff03 100644
+--- a/src/Ascension/AscWorldEntryTweaks.cpp
++++ b/src/Ascension/AscWorldEntryTweaks.cpp
+@@ -58,9 +58,9 @@ namespace
+ 
+     bool StockClass(const uint8_t* player)   // FUN_100c6380
+     {
+-        const uint32_t type = *reinterpret_cast<const uint32_t*>(player + 0x14);
++        const uint32_t type = *reinterpret_cast<const uint32_t*>(player + ASC_OFF(0x14, 0x24));
+         const uint8_t cls = (type == 3 || type == 4)
+-            ? static_cast<uint8_t>(*reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(player + 8) + 0x5C) >> 8)
++            ? static_cast<uint8_t>(*reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(player + ASC_OFF(8, 0x10)) + 0x5C) >> 8)
+             : 0;
+         return (cls >= 1 && cls <= 9) || cls == 11;
+     }

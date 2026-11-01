@@ -1,0 +1,55 @@
+diff --git a/WoW/Source/Object/MovementShared.cpp b/WoW/Source/Object/MovementShared.cpp
+index f9ea4f5..ffb64da 100644
+--- a/WoW/Source/Object/MovementShared.cpp
++++ b/WoW/Source/Object/MovementShared.cpp
+@@ -1232,6 +1232,12 @@ void CMovementShared::StartPitch(int32_t up) {
+     this->UpdateAnchors(0);
+ }
+ 
++#if defined(_WIN64)
++// CoA: SetAura137Patch do Extensions.dll: 1 = recalcula a direcao mesmo caindo (force) ao virar/mudar facing.
++// STATIC: 0x00989B9A
++int32_t g_coaAura137 = 0;
++#endif
++
+ // VERIFY: 7f7081f3 manual
+ // OFFSET: 0x00988DF0
+ void CMovementShared::StartTurn(int32_t left) {
+@@ -1242,7 +1248,11 @@ void CMovementShared::StartTurn(int32_t left) {
+     }
+ 
+     this->m_flags2 &= ~MOVEMENTFLAG2_INTERPOLATED_TURNING;
++#if defined(_WIN64)
++    this->UpdateAnchors(g_coaAura137 ? 1 : 0);   // CoA: 0x988E48
++#else
+     this->UpdateAnchors(0);
++#endif
+ }
+ 
+ // VERIFY: a15f6480 manual
+@@ -1319,7 +1329,11 @@ int32_t CMovementShared::StopTurn() {
+     }
+ 
+     this->m_flags = flags & ~(MOVEMENTFLAG_TURN_LEFT | MOVEMENTFLAG_TURN_RIGHT);
++#if defined(_WIN64)
++    this->UpdateAnchors(g_coaAura137 ? 1 : 0);   // CoA: 0x989053
++#else
+     this->UpdateAnchors(0);
++#endif
+     return 1;
+ }
+ 
+@@ -1492,8 +1506,13 @@ void CMovementShared::SetRawFacing(float facing) {
+         int32_t falling = this->m_flags & MOVEMENTFLAG_FALLING;
+         this->m_facing = facing;
+ 
++#if defined(_WIN64)
++        if (!falling || g_coaAura137) {   // CoA: 0x989B97 / 0x989B9A
++            this->UpdateAnchors(g_coaAura137 ? 1 : 0);
++#else
+         if (!falling) {
+             this->UpdateAnchors(0);
++#endif
+         }
+     }
+ 

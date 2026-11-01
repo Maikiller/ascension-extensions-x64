@@ -1,0 +1,55 @@
+diff --git a/src/Ascension/AscAlternatePower.cpp b/src/Ascension/AscAlternatePower.cpp
+index 9d3b680..298d4cd 100644
+--- a/src/Ascension/AscAlternatePower.cpp
++++ b/src/Ascension/AscAlternatePower.cpp
+@@ -16,6 +16,7 @@
+ // kind-3 objects (0x10A4BAF0) -- 1 there zeroes the unit's health descriptor and runs 0x729220.
+ #include <Ascension/AscBindings.hpp>
+ #include <Ascension/AscX64.hpp>
++#include <Ascension/AscClientDbc.hpp>
+ #include <Ascension/AscCAMgr.hpp>
+ #include <Ascension/AscObjectAddon.hpp>
+ #include <Ascension/AscRuntime.hpp>
+@@ -90,8 +91,14 @@ namespace
+         uint8_t rec[0x2A8];
+         if (reinterpret_cast<int(__thiscall*)(uint8_t*, uint32_t)>(ASC_PTR(0x7282A0))(player, g_jumpSpell))
+         {
++#if ASC_X64
++            // Spell_C_CancelAura(const SpellRec*, ...) le o registro no layout x64: a copia do FetchSpell e x86
++            if (const void* native = AscClientDbc::Native(0xAD49D0, g_jumpSpell))
++                reinterpret_cast<void(__cdecl*)(const void*, uint8_t*, int)>(ASC_PTR(0x802F80))(native, player, 0);
++#else
+             if (AscScript::FetchSpell(g_jumpSpell, rec))
+                 reinterpret_cast<void(__cdecl*)(uint8_t*, uint8_t*, int)>(ASC_PTR(0x802F80))(rec, player, 0);
++#endif
+             return;
+         }
+         if (!AscScript::FetchSpell(g_jumpSpell, rec))
+diff --git a/src/Ascension/AscAuraAmounts.cpp b/src/Ascension/AscAuraAmounts.cpp
+index cb56af0..9f1a27c 100644
+--- a/src/Ascension/AscAuraAmounts.cpp
++++ b/src/Ascension/AscAuraAmounts.cpp
+@@ -10,6 +10,7 @@
+ // UNIT_HEAL_ABSORB_AMOUNT_CHANGED ("%s", token) for each unit token naming the unit (FUN_10a13440).
+ #include <Ascension/AscBindings.hpp>
+ #include <Ascension/AscX64.hpp>
++#include <Ascension/AscClientDbc.hpp>
+ #include <Ascension/AscScript.hpp>
+ #include <Ascension/AscRuntime.hpp>
+ #include <Client/CDataStore.hpp>
+@@ -100,8 +101,15 @@ namespace
+             else
+             {
+                 uint64_t guid = unit;
++#if ASC_X64
++                // CGSpellBook::CanShowAura le o SpellRec no layout x64 -- a copia `rec` e x86
++                const void* native = AscClientDbc::Native(0xAD49D0, spell);
++                if (ActivePlayerGuid() != unit
++                    && !(native && reinterpret_cast<uint32_t(__cdecl*)(const void*, uint64_t*, int)>(ASC_PTR(0x53D580))(native, &guid, 1) & 0xFF))
++#else
+                 if (ActivePlayerGuid() != unit
+                     && !(reinterpret_cast<uint32_t(__cdecl*)(const uint8_t*, uint64_t*, int)>(ASC_PTR(0x53D580))(rec, &guid, 1) & 0xFF))
++#endif
+                     return true;
+                 list.push_back({caster, spell, {amount[0], amount[1], amount[2]}});
+             }

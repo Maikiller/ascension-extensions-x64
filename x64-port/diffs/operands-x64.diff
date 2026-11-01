@@ -1,0 +1,196 @@
+diff --git a/src/Ascension/AscAttachPatches.cpp b/src/Ascension/AscAttachPatches.cpp
+index f6d4c9a..fd1c757 100644
+--- a/src/Ascension/AscAttachPatches.cpp
++++ b/src/Ascension/AscAttachPatches.cpp
+@@ -61,6 +61,94 @@ namespace
+ 
+     void RaceTables();
+ 
++#if ASC_X64
++    // (b) operandos: os bytes x86 da tabela nao valem no codigo x64. Versao propria de cada site, conferida no
++    // disasm 32/64 (out/operands-x64-parcial.md): {endereco 12340, delta x64, n, bytes novos, bytes stock x64}.
++    // O endereco x64 vem da linha do extra-addr; delta != 0 so no 0x632163 (o x64 duplicou o cmp).
++    struct PatchX64
++    {
++        uint32_t address;
++        int32_t delta;
++        uint32_t size;
++        uint8_t bytes[20];
++        uint8_t expect[20];
++    };
++    const PatchX64 kPatchesX64[] = {
++        {0x464C4F,  0,  5, {0x80, 0x7C, 0x24, 0x70, 0x80}, {0x80, 0x7C, 0x24, 0x70, 0x0A}},   // HandleCharEnum: cmp byte [n],0xA -> 0x80
++        {0x5663D4,  0,  6, {0x81, 0xFB, 0x00, 0x02, 0x00, 0x00}, {0x81, 0xFB, 0x00, 0x01, 0x00, 0x00}},   // SetMacroBody: limite 0x100 -> 0x200
++        {0x56E499,  0,  5, {0x05, 0x01, 0x00, 0x00, 0x00}, {0x05, 0x60, 0xEA, 0x00, 0x00}},   // Script_CheckInbox: add 60000 -> 1
++        {0x574A5F,  0,  7, {0x83, 0xB8, 0xC0, 0x00, 0x00, 0x00, 0x00}, {0x83, 0xB8, 0xC0, 0x00, 0x00, 0x00, 0x0A}},   // Script_ConvertToRaid: cmp [..+0xC0],0xA -> 0
++        {0x611717,  0,  5, {0x80, 0xF9, 0x0A, 0x7C, 0x36}, {0x80, 0xF9, 0x0B, 0x75, 0x36}},   // Script_GetComboPoints: cmp 0xB;jne -> cmp 0xA;jl
++        {0x7FF2A5,  0,  6, {0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, {0x81, 0xC3, 0xF4, 0x01, 0x00, 0x00}},   // SpellRec::GetCastTime: NOP no add ebx,500
++        {0x5AE56B,  0,  3, {0x83, 0xFB, 0x14}, {0x83, 0xFB, 0x0A}},   // GetNextFreeSetID: 10 -> 20 conjuntos
++        {0x5AF142,  0,  3, {0x83, 0xF8, 0x14}, {0x83, 0xF8, 0x09}},   // Script_GetEquipmentSetInfo: 9 -> 0x14
++        {0x5AF485,  0,  3, {0x83, 0xFB, 0x14}, {0x83, 0xFB, 0x0A}},   // CanCreateSet: 10 -> 20
++        {0x5AF548,  0,  4, {0x41, 0x83, 0xFE, 0x14}, {0x41, 0x83, 0xFE, 0x0A}},   // SMSG_EQUIPMENT_SET_LIST: 10 -> 20
++        {0x5AF809,  0,  3, {0x83, 0xFB, 0x14}, {0x83, 0xFB, 0x0A}},   // CreateEquipmentSet: 10 -> 20
++        {0x5AFB64,  0,  6, {0x41, 0xB8, 0x14, 0x00, 0x00, 0x00}, {0x41, 0xB8, 0x0A, 0x00, 0x00, 0x00}},   // Script_SaveEquipmentSet: texto "%d sets" 10 -> 20
++        {0x632163,  0,  3, {0x83, 0xFA, 0x08}, {0x83, 0xFA, 0x10}},   // GetNetStats: historico de ping 16 -> 8
++        {0x632163, 10,  3, {0x83, 0xFA, 0x08}, {0x83, 0xFA, 0x10}},   // GetNetStats: 2a copia do cmp 0x10
++        {0x63264A,  0,  3, {0x83, 0xF8, 0x08}, {0x83, 0xF8, 0x10}},   // HandlePong: 16 -> 8
++        {0x63266A,  0,  3, {0x83, 0xF8, 0x08}, {0x83, 0xF8, 0x10}},   // HandlePong: 16 -> 8
++        {0x632DE5,  0,  5, {0xBA, 0x78, 0xEC, 0xFF, 0xFF}, {0xBA, 0xD0, 0x8A, 0xFF, 0xFF}},   // HandleIdle: -30000 -> -5000 ms
++        {0x54CFD4,  0,  6, {0x8D, 0x83, 0xF4, 0x01, 0x00, 0x00}, {0x8D, 0x83, 0x88, 0x13, 0x00, 0x00}},   // RequestPlayerPositions: +5000 -> +500 ms
++        {0x4910DB,  0,  5, {0xBA, 0xD0, 0x07, 0x00, 0x00}, {0xBA, 0x80, 0x00, 0x00, 0x00}},   // SetFrameLevel: teto 0x80 -> 2000
++        {0x802221,  0,  2, {0x90, 0x90}, {0x77, 0x3F}},   // Script_CancelItemTempEnchantment: o x86 grava 02 SOBRE o opcode do ja
++        {0x59DC63,  0,  2, {0xEB, 0x24}, {0x74, 0x24}},   // Script_PlaceAuctionBid: je -> jmp
++        {0x5A5163,  0,  2, {0xEB, 0x16}, {0x74, 0x16}},   // GuildBank SwapItems: je
++        {0x5A522F,  0,  2, {0xEB, 0x14}, {0x75, 0x14}},   // GuildBank SwapItems: jne
++        {0x5A52E4,  0,  2, {0xEB, 0x0F}, {0x75, 0x0F}},   // GuildBank SwapItems: jne
++        {0x5A5472,  0,  2, {0xEB, 0x0F}, {0x75, 0x0F}},   // GuildBank SwapBankItems: jne
++        {0x5A6506,  0,  2, {0xEB, 0x0F}, {0x75, 0x0F}},   // Script_AutoStoreGuildBankItem: jne
++        {0x5A6956,  0,  2, {0x90, 0x90}, {0x74, 0x0F}},   // Script_GetGuildBankTabInfo: je
++        {0x5AC94D,  0,  6, {0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, {0x0F, 0x84, 0x25, 0x02, 0x00, 0x00}},   // CGGMTicketInfo::CreateTicket: je
++        {0x5CF2F6,  0,  2, {0xEB, 0x0F}, {0x75, 0x0F}},   // Script_OfferPetition: jne
++        {0x5AD0B0,  0,  4, {0x90, 0x90, 0x90, 0x90}, {0x85, 0xC0, 0x74, 0x4E}},   // Script_NewGMTicket: test eax,eax; je
++        {0x5D6E9C,  0,  2, {0xEB, 0x07}, {0x75, 0x07}},   // SendRequestPetInfo: sempre envia
++        {0x52ABD9,  0,  2, {0xEB, 0x47}, {0x8B, 0xC8}},   // InitializeFrameXML: pula o switch da assinatura do FrameXML
++        {0x52ADCC,  0,  5, {0x90, 0x90, 0x90, 0x90, 0x90}, {0xE8, 0xFA, 0xB3, 0x05, 0x00}},   // InitializeFrameXML: NOP no call CGGameUI::Initialize
++        {0x4E4BC2,  0,  6, {0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, {0x0F, 0x82, 0x8D, 0x02, 0x00, 0x00}},   // CGlueMgr::SurveyExecute: jb
++        {0x4E57FE,  0,  2, {0x90, 0x90}, {0x72, 0x5B}},   // CGlueMgr::PatchDownloadApply: autenticacao < 5 segue p/ o prepatch
++        {0x707BA3,  0,  2, {0xEB, 0x3C}, {0x7E, 0x3C}},   // OnUpdateDurability: jle -> jmp
++        {0x707BE2,  0,  5, {0x90, 0x90, 0x90, 0x90, 0x90}, {0xE8, 0x12, 0x86, 0x03, 0x00}},   // OnUpdateDurability: NOP no call CGPlayer_C::EquipItem
++        {0x708328,  0,  6, {0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, {0x0F, 0x85, 0x86, 0x03, 0x00, 0x00}},   // CGItem_C::CanGoInSlot slot 17: x86 je->jmp
++        {0x634B07,  0,  2, {0xEB, 0x17}, {0x76, 0x17}},   // InitResistances: jbe -> jmp
++        {0x74135D,  0,  2, {0xEB, 0x73}, {0x74, 0x73}},   // CGUnit_C::Dismount: je
++        {0x57E9A8,  0,  4, {0xB1, 0x03, 0x90, 0x90}, {0x0F, 0xB6, 0x49, 0x45}},   // CGMinimapFrame::CountAvailableTrackingTypes: classe fixa 3
++        {0x57EB27,  0, 13, {0x41, 0xB8, 0x01, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, {0x41, 0xB8, 0x01, 0x00, 0x00, 0x00, 0x0F, 0xB6, 0x49, 0x45, 0x41, 0xD3, 0xE0}},   // GetTrackingTypeInfo: o resultado final do x86
++        {0x731480,  0,  2, {0xEB, 0x17}, {0x7D, 0x17}},   // CGUnit_C::OnRightClick: jge -> jmp
++        {0x70ED92,  0,  2, {0x90, 0x90}, {0x75, 0x2E}},   // CGGameObject_C::Reenable: NOP no jne
++        {0x71C2C0,  0, 20, {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, {0x48, 0x8B, 0x05, 0x21, 0x79, 0x85, 0x00, 0x83, 0x78, 0x54, 0x00, 0x74, 0x07, 0x8B, 0x81, 0x1C, 0x18, 0x00, 0x00, 0xC3}},   // CGUnit_C::GetPredictedHealth: NOP no ramo predictedHealth
++        {0x783310,  0,  2, {0xEB, 0x57}, {0x76, 0x57}},   // CWorld::Update: jne -> jmp
++        {0x819A74,  0,  2, {0xEB, 0x07}, {0x75, 0x07}},   // Script_debuglocals: jne -> jmp
++        {0x634E28,  0, 10, {0xC7, 0x05, 0xA8, 0xB4, 0x7C, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xC7, 0x05, 0xA8, 0xB4, 0x7C, 0x00, 0x01, 0x00, 0x00, 0x00}},   // ClientDBInitialize: flag dbCompress = 0
++        {0x5CBA74,  0,  6, {0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, {0x88, 0x05, 0xBC, 0xDF, 0x6C, 0x00}},   // Packet_MSG_GUILD_PERMISSIONS: NOP no store do rank
++        {0x81C9A8,  0,  2, {0xB2, 0x01}, {0x33, 0xD2}},   // CM2Scene::SetTime: GarbageCollect(force 0->1). x64 xor edx,edx -> mov 
++        {0x81C9D9,  0,  2, {0xB2, 0x01}, {0x33, 0xD2}},   // CM2Scene::AdvanceTime: idem
++        {0x5FD886,  0,  2, {0x90, 0x90}, {0x72, 0x07}},   // ValidateCameraLinearSpeed: sem teto
++        {0x517EE8,  0,  2, {0xEB, 0x37}, {0x45, 0x8B}},   // PlacedFrameCallback: nao grava "FrameLevel: %d"
++        {0x5184E1,  0,  2, {0xEB, 0x41}, {0x48, 0x8D}},   // LoadPlacedFrames: nao le "FrameLevel: "
++    };
++
++    // Sites da tabela x86 que o x64 resolve acima, ou que nao se aplicam: NA (sem efeito / o fonte ja faz /
++    // DISABLE_SIGNATURE_CHECKS), DUP (coberto por outro site x64) e 0x728AA3 (o AscCAMgr grava o cmp em
++    // 0x728AA1 no init e confere os bytes; o 00 daqui faria o expect dele recusar).
++    bool CoveredX64(uint32_t address)
++    {
++        for (uint32_t at : {0x464C4Fu, 0x4910DBu, 0x4910E2u, 0x4DA8EBu, 0x4E4BC2u, 0x4E57FEu, 0x517EE8u, 0x5184E1u,
++                            0x52ABD9u, 0x52AD43u, 0x52AD45u, 0x52ADCCu, 0x54CFD4u, 0x5663D4u, 0x56E499u, 0x574A5Fu,
++                            0x57E9A8u, 0x57EB27u, 0x57EB2Du, 0x57EB32u, 0x59DC63u, 0x5A5163u, 0x5A522Fu, 0x5A52E4u,
++                            0x5A5472u, 0x5A6506u, 0x5A6956u, 0x5AC94Du, 0x5AD0B0u, 0x5AE56Bu, 0x5AF142u, 0x5AF485u,
++                            0x5AF548u, 0x5AF809u, 0x5AFB64u, 0x5CBA74u, 0x5CF2F6u, 0x5D6E9Cu, 0x5D6EA6u, 0x5F83ECu,
++                            0x5FD886u, 0x611717u, 0x632163u, 0x63264Au, 0x63266Au, 0x632DE5u, 0x634B07u, 0x634E28u,
++                            0x6DBE41u, 0x6E2867u, 0x707BA3u, 0x707BE2u, 0x708328u, 0x70ED92u, 0x71C2C0u, 0x728AA3u,
++                            0x731480u, 0x74135Du, 0x783310u, 0x7FF2A5u, 0x802221u, 0x819A74u, 0x81C9A8u, 0x81C9D9u})
++            if (at == address)
++                return true;
++        return false;
++    }
++#endif
++
+     void Write(uint32_t address, const void* bytes, uint32_t size)
+     {
+ #if ASC_X64
+@@ -102,8 +190,16 @@ namespace
+                 const uint32_t text = reinterpret_cast<uint32_t>(kUiScaleDefault);
+                 Write(0x5238AE, &text, 4);   // HOOKED 0x5238AE
+             }
++#if ASC_X64
++            if (CoveredX64(p.address))
++                continue;
++#endif
+             Write(p.address, p.bytes, p.size);
+         }
++#if ASC_X64
++        for (const PatchX64& p : kPatchesX64)
++            AscX64::WriteCodeX64(p.address, p.bytes, p.size, p.expect, p.delta);
++#endif
+         RaceTables();
+     }
+ 
+diff --git a/src/Ascension/AscClientOptions.cpp b/src/Ascension/AscClientOptions.cpp
+index f4ba10d..ae23132 100644
+--- a/src/Ascension/AscClientOptions.cpp
++++ b/src/Ascension/AscClientOptions.cpp
+@@ -55,9 +55,17 @@ namespace
+     {
+         static const uint8_t kJne[] = {0x0F, 0x85, 0x01, 0x01, 0x00, 0x00}, kNop[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+         const bool on = IsOne(value);
++#if ASC_X64
++        // CGUnit_C::ChatBubbleShow: jne [+0x1470] (0F 85 3C 01 00 00); NamePlateAddOrUpdate: je (74) <-> jmp
++        static const uint8_t kJneX64[] = {0x0F, 0x85, 0x3C, 0x01, 0x00, 0x00}, kJe[] = {0x74}, kJmp[] = {0xEB};
++        AscX64::WriteCodeX64(0x720020, on ? kNop : kJneX64, 6, on ? kJneX64 : kNop);
++        PatchValue<float*>(0x56C76B, &g_bubbleHeight);
++        AscX64::WriteCodeX64(0x725737, on ? kJmp : kJe, 1, on ? kJe : kJmp);
++#else
+         PatchBytes(0x720020, on ? kNop : kJne);
+         PatchValue<float*>(0x56C76B, &g_bubbleHeight);
+         PatchValue<uint8_t>(0x725737, on ? 0xEB : 0x74);
++#endif
+         return 1;
+     }
+ 
+@@ -323,7 +331,12 @@ namespace
+     }
+     int __cdecl OnSoundEnableFall(void*, const char*, const char* value, void*)   // FUN_10a47780
+     {
++#if ASC_X64
++        static const uint8_t kJle[] = {0x7E}, kJmp[] = {0xEB};   // CGUnit_C::OnCollideFallLand: jle <-> jmp
++        AscX64::WriteCodeX64(0x73D46A, IsOne(value) ? kJle : kJmp, 1, IsOne(value) ? kJmp : kJle);
++#else
+         PatchValue<uint8_t>(0x73D46A, IsOne(value) ? 0x7E : 0xEB);
++#endif
+         return 1;
+     }
+ 
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+index faf76b4..a8348d9 100644
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -148,7 +148,7 @@ bool WriteMem(uint32_t addr, const void* bytes, size_t n, const char*)
+ #endif
+ 
+ #if ASC_X64
+-bool WriteCodeX64(uint32_t addr, const void* bytes, size_t n, const void* expect)
++bool WriteCodeX64(uint32_t addr, const void* bytes, size_t n, const void* expect, ptrdiff_t delta)
+ {
+     uint8_t* p = static_cast<uint8_t*>(Ptr(addr));
+     if (!p)
+@@ -156,6 +156,7 @@ bool WriteCodeX64(uint32_t addr, const void* bytes, size_t n, const void* expect
+         AscLog::Printf("x64: WriteCodeX64 0x%06X sem endereco x64 (falta a linha no extra-addr)", addr);
+         return false;
+     }
++    p += delta;
+     if (memcmp(p, bytes, n) == 0)
+         return true;   // ja aplicado
+     if (expect && memcmp(p, expect, n) != 0)
+diff --git a/src/Ascension/AscX64.hpp b/src/Ascension/AscX64.hpp
+index fd56927..dd6b691 100644
+--- a/src/Ascension/AscX64.hpp
++++ b/src/Ascension/AscX64.hpp
+@@ -2,6 +2,7 @@
+ // CoA x64: o DLL roda dentro do WowClient64.exe (cliente recompilado do fonte), nao do Ascension.exe 12340.
+ // Cada endereco 12340 do codigo vira um ponteiro do exe x64 via WowAddr() (tabela WowClient64.addr gerada
+ // do PDB). Hooks usam MinHook. Modulos so sao instalados quando portados (AscX64::ModulePorted).
++#include <cstddef>
+ #include <cstdint>
+ 
+ #if defined(_WIN64)
+@@ -37,8 +38,9 @@ namespace AscX64
+ #if ASC_X64
+     // Patch de codigo no exe x64 (out/midpatch-x64.md): resolve addr12340 pela tabela (as linhas "fn +off" do
+     // extra-addr), confere que os n bytes atuais sao `expect` (ou ja sao `bytes`), e so entao escreve com
+-    // VirtualProtect + FlushInstructionCache. Se nao bater, loga o que achou e nao escreve.
+-    bool WriteCodeX64(uint32_t addr12340, const void* bytes, size_t n, const void* expect);
++    // VirtualProtect + FlushInstructionCache. Se nao bater, loga o que achou e nao escreve. `delta` desloca o
++    // destino a partir do endereco x64 resolvido (sites que o x64 duplicou, ex. as 2 copias do 0x632163).
++    bool WriteCodeX64(uint32_t addr12340, const void* bytes, size_t n, const void* expect, ptrdiff_t delta = 0);
+ #endif
+ 
+     // Lista branca dos modulos ja portados para x64 (nome do modulo em AscBindings).

@@ -1,0 +1,212 @@
+diff --git a/src/Ascension/AscAppearance.cpp b/src/Ascension/AscAppearance.cpp
+index 8098979..d69f7f6 100644
+--- a/src/Ascension/AscAppearance.cpp
++++ b/src/Ascension/AscAppearance.cpp
+@@ -987,8 +987,9 @@ namespace
+         {
+             g_setsForItemAppearanceBuilt = true;
+             s_map.clear();
+-            const uint32_t lo = *reinterpret_cast<const uint32_t*>(kItemSetDbc + 0x10);
+-            const uint32_t hi = *reinterpret_cast<const uint32_t*>(kItemSetDbc + 0x0C);
++            // min/max id do cabecalho do ItemSet.dbc (kItemSetDbc +0x10/+0x0C; no x64 +0x14/+0x10, extra-addr)
++            const uint32_t lo = *reinterpret_cast<const uint32_t*>(ASC_PTR(0xAD3F0C));
++            const uint32_t hi = *reinterpret_cast<const uint32_t*>(ASC_PTR(0xAD3F08));
+             for (uint32_t id = lo; id && id <= hi; ++id)
+             {
+                 const uint8_t* set = ClientDbcRow(kItemSetDbc, id);
+diff --git a/src/Ascension/AscAttachMisc.cpp b/src/Ascension/AscAttachMisc.cpp
+index 8e7cfaa..919870d 100644
+--- a/src/Ascension/AscAttachMisc.cpp
++++ b/src/Ascension/AscAttachMisc.cpp
+@@ -29,8 +29,11 @@ namespace
+ {
+     typedef int(__cdecl* Signal_t)(int, const char*, void*);
+     typedef int(__fastcall* CVarSet_t)(uint8_t* ASC_EDX_P(void*), const char*, uint32_t, uint32_t, uint32_t, uint32_t);
+-    typedef int(__cdecl* Fn4_t)(uint32_t, uint32_t, uint32_t, uint32_t);
+-    typedef int(__cdecl* Fn6_t)(uint32_t, const uint8_t*, uint32_t, uint32_t, uint32_t, uint32_t);
++    // handlers de pacote (void* param, NETMESSAGE, unsigned time, CDataStore*) e Spell_C_SpellFailed(PendingSpellCast*,
++    // const SpellRec*, int, int, int, bool): os ponteiros em uintptr_t (x86 = mesmo tipo) -- no x64 o original
++    // recebia o CDataStore* / PendingSpellCast* truncado.
++    typedef int(__cdecl* Fn4_t)(uintptr_t, uint32_t, uint32_t, uintptr_t);
++    typedef int(__cdecl* Fn6_t)(uintptr_t, const uint8_t*, uint32_t, uint32_t, uint32_t, uint32_t);
+     Signal_t g_81AC90 = nullptr;
+     CVarSet_t g_7668C0 = nullptr;
+     Fn4_t g_403DE0 = nullptr, g_5B3020 = nullptr, g_5B32F0 = nullptr, g_5B3610 = nullptr;
+@@ -47,14 +50,19 @@ namespace
+         snprintf(line, sizeof(line),
+                  "Blocked invalid FrameScript signal event at 0x0081AC90: eventId=%d, registeredEventCount=%u, "
+                  "format=%s, vaList=0x%X, hasEventData=%s, hasEventObject=false",
+-                 id, count, format ? format : "", reinterpret_cast<uint32_t>(va), entries ? "true" : "false");
++                 id, count, format ? format : "", static_cast<uint32_t>(reinterpret_cast<uintptr_t>(va)), entries ? "true" : "false");
+         AscLogger::Write(5, line);
+         return 0;
+     }
+ 
+     int __fastcall Hook7668C0(uint8_t* cvar ASC_EDX_P(void* edx), const char* value, uint32_t b, uint32_t c, uint32_t d, uint32_t e)
+     {
++#if ASC_X64
++        // CVar : TSHashObject<CVar, HASHKEY_STRI> -- m_key.m_str em +0x28 no x64 (PDB), +0x14 no x86
++        const char* name = *reinterpret_cast<const char* const*>(cvar + 0x28);
++#else
+         const char* name = AscClientDbc::Str(cvar, 0x14);
++#endif
+         const char* v = strcmp(name, "scriptProfile") != 0 ? value : "0";
+         if (strcmp(name, "nameplateShowEnemies") == 0)
+         {
+@@ -65,7 +73,7 @@ namespace
+         return g_7668C0(cvar ASC_EDX_A(edx), v, b, c, d, e);
+     }
+ 
+-    int __cdecl Hook403DE0(uint32_t a, uint32_t b, uint32_t c, uint32_t d)
++    int __cdecl Hook403DE0(uintptr_t a, uint32_t b, uint32_t c, uintptr_t d)
+     {
+         AscScript::Packet(0x53B).Send();   // FUN_100e08b0
+         AscAutoQuest_Clear();
+@@ -73,26 +81,26 @@ namespace
+         return g_403DE0(a, b, c, d);
+     }
+ 
+-    int __cdecl Hook5B3020(uint32_t a, uint32_t b, uint32_t c, uint32_t d)
++    int __cdecl Hook5B3020(uintptr_t a, uint32_t b, uint32_t c, uintptr_t d)
+     {
+         g_5B3020(a, b, c, d);
+         AscChallenge_ScheduleRebuild();
+         return 1;
+     }
+-    int __cdecl Hook5B32F0(uint32_t a, uint32_t b, uint32_t c, uint32_t d)
++    int __cdecl Hook5B32F0(uintptr_t a, uint32_t b, uint32_t c, uintptr_t d)
+     {
+         g_5B32F0(a, b, c, d);
+         AscChallenge_ScheduleRebuild();
+         return 1;
+     }
+-    int __cdecl Hook5B3610(uint32_t a, uint32_t b, uint32_t c, uint32_t d)
++    int __cdecl Hook5B3610(uintptr_t a, uint32_t b, uint32_t c, uintptr_t d)
+     {
+         g_5B3610(a, b, c, d);
+         AscChallenge_ScheduleRebuild();
+         return 1;
+     }
+ 
+-    int __cdecl Hook808200(uint32_t a, const uint8_t* rec, uint32_t result, uint32_t d, uint32_t e, uint32_t f)
++    int __cdecl Hook808200(uintptr_t a, const uint8_t* rec, uint32_t result, uint32_t d, uint32_t e, uint32_t f)
+     {
+         const uint32_t attr = *reinterpret_cast<const uint32_t*>(rec + 0x10);
+         const uint32_t attrEx = *reinterpret_cast<const uint32_t*>(rec + 0x14);
+diff --git a/src/Ascension/AscChallenge.cpp b/src/Ascension/AscChallenge.cpp
+index b5a1ead..deb8c18 100644
+--- a/src/Ascension/AscChallenge.cpp
++++ b/src/Ascension/AscChallenge.cpp
+@@ -264,7 +264,7 @@ namespace
+         uint8_t* p = Player();
+         if (!p)
+             return 0;
+-        const uint32_t type = *reinterpret_cast<uint32_t*>(p + 0x14);
++        const uint32_t type = *reinterpret_cast<uint32_t*>(p + ASC_OFF(0x14, 0x24));   // m_objectType
+         if (type != 3 && type != 4)
+             return 0;
+         return (*reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(p + ASC_OFF(8, 0x10)) + 0x5C) >> 8) & 0xFF;
+diff --git a/src/Ascension/AscGlobalsC.cpp b/src/Ascension/AscGlobalsC.cpp
+index b86cbd5..a47e8e9 100644
+--- a/src/Ascension/AscGlobalsC.cpp
++++ b/src/Ascension/AscGlobalsC.cpp
+@@ -129,7 +129,13 @@ namespace
+         if (!FetchSpell(static_cast<uint32_t>(ArgInt(L, 1)), rec))
+             return 0;
+         int32_t add = 0, pct = 100;
++#if ASC_X64
++        // Spell_C_GetSpellModifiers le o SpellRec no layout x64 -- a copia `rec` (x86) so serve para o +0xC4 abaixo
++        if (const void* native = AscClientDbc::Native(0xAD49D0, static_cast<uint32_t>(ArgInt(L, 1))))
++            reinterpret_cast<void(__cdecl*)(const void*, int, int32_t*, int32_t*)>(ASC_PTR(0x7FD970))(native, 0x1F, &add, &pct);
++#else
+         reinterpret_cast<void(__cdecl*)(void*, int, int32_t*, int32_t*)>(ASC_PTR(0x7FD970))(rec, 0x1F, &add, &pct);
++#endif
+         int32_t stack = *reinterpret_cast<int32_t*>(rec + 0xC4);
+         if (add != 0 || pct != 0)
+             stack = ((add + stack) * pct) / 100;
+diff --git a/src/Ascension/AscGlobalsI.cpp b/src/Ascension/AscGlobalsI.cpp
+index 0e24abb..c596dd9 100644
+--- a/src/Ascension/AscGlobalsI.cpp
++++ b/src/Ascension/AscGlobalsI.cpp
+@@ -180,8 +180,15 @@ namespace
+     // a creature. 0xD4139C is cleared for the scan and restored only when a candidate was found.
+     int TargetClosestEnemy(lua_State*)
+     {
++#if ASC_X64
++        // lua_tainted (0xD4139C) e const char*: 8 bytes no x64 -- a gravacao de 4 deixaria a metade alta
++        uintptr_t* taint = reinterpret_cast<uintptr_t*>(ASC_PTR(0xD4139C));
++        const uintptr_t saved = *taint;
++        *taint = 0;
++#else
+         const uint32_t saved = *reinterpret_cast<const uint32_t*>(ASC_PTR(0xD4139C));
+         WriteProtected(0xD4139C, 0);
++#endif
+         uint8_t* player = ActivePlayer();
+         float p[3];
+         Position(player, p);
+@@ -197,7 +204,11 @@ namespace
+         {
+             if (*reinterpret_cast<const int32_t*>(best + ASC_OFF(0x14, 0x24)) == 3)
+                 TargetUnit(best);
++#if ASC_X64
++            *taint = saved;
++#else
+             WriteProtected(0xD4139C, saved);
++#endif
+         }
+         return 0;
+     }
+diff --git a/src/Ascension/AscLibrary.cpp b/src/Ascension/AscLibrary.cpp
+index e12840d..c4da8ae 100644
+--- a/src/Ascension/AscLibrary.cpp
++++ b/src/Ascension/AscLibrary.cpp
+@@ -58,7 +58,8 @@ namespace
+ 
+     // FUN_10a70bf0: write only one addon's SavedVariables. Every other addon whose saved-variables
+     // record (0x55F4D0 on 0xC2491C) has its +0x18 "dirty" flag set is cleared, 0x5F5620 saves, then
+-    // those flags are restored and the named addon's is set.
++    // those flags are restored and the named addon's is set. (UIADDON: o flag e o 1o campo depois do
++    // TSHashObject -- +0x18 no x86, +0x30 no x64.)
+     int SaveSavedVariables(lua_State* L)
+     {
+         const std::string name = CheckString(L, 1);
+@@ -73,18 +74,18 @@ namespace
+             if (name == addon)
+                 continue;
+             uint8_t* rec = record(table, addon);
+-            if (rec && rec[0x18])
++            if (rec && rec[ASC_OFF(0x18, 0x30)])
+             {
+-                rec[0x18] = 0;
++                rec[ASC_OFF(0x18, 0x30)] = 0;
+                 cleared.push_back(addon);
+             }
+         }
+         reinterpret_cast<void(__cdecl*)()>(ASC_PTR(0x5F5620))();
+         for (const std::string& a : cleared)
+             if (uint8_t* rec = record(table, a.c_str()))
+-                rec[0x18] = 1;
++                rec[ASC_OFF(0x18, 0x30)] = 1;
+         if (uint8_t* rec = record(table, name.c_str()))
+-            rec[0x18] = 1;
++            rec[ASC_OFF(0x18, 0x30)] = 1;
+         return 0;
+     }
+ 
+diff --git a/src/Ascension/AscX64.cpp b/src/Ascension/AscX64.cpp
+index 723e4ec..7a1c0e9 100644
+--- a/src/Ascension/AscX64.cpp
++++ b/src/Ascension/AscX64.cpp
+@@ -38,6 +38,12 @@ namespace
+         "AscGameObjectUse", "AscSkillCardSlots", "AscSkillCardCollection", "AscRecoveryService", "AscCustomStore",
+         "AscGMTicket", "AscGroupFinder", "AscMysticEnchantPreset", "AscTrialCreator",
+         "AscTemplates", "AscGlobalsH", "AscSpellActivationOverlay", "AscAlternatePower", "AscAuraAmounts",
++        // lote 3 (30/10, projects-6a): revisados um a um (x64-lote3-6a.diff). Corrigidos: AscChallenge (tipo do
++        // objeto ASC_OFF), AscAppearance (cabecalho do ItemSet.dbc via extra-addr), AscGlobalsI (lua_tainted
++        // 8 bytes), AscLibrary (UIADDON flag +0x30), AscAttachMisc (log do va_list).
++        "AscAppearance", "AscAttachMisc", "AscCAFilter", "AscCallboardCache", "AscChallenge", "AscDraftMode",
++        "AscGlobalsC", "AscGlobalsI", "AscScrollOfFortune", "AscSmallApis", "AscCacheFiles", "AscLibrary",
++        "AscExtraActionButton",
+         nullptr };
+ }
+ 

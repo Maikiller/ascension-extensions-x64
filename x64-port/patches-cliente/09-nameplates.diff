@@ -1,0 +1,72 @@
+diff --git a/WoW/Source/Object/ObjectClient/Unit_C.cpp b/WoW/Source/Object/ObjectClient/Unit_C.cpp
+index 9385297..2e3ea36 100644
+--- a/WoW/Source/Object/ObjectClient/Unit_C.cpp
++++ b/WoW/Source/Object/ObjectClient/Unit_C.cpp
+@@ -20150,6 +20150,12 @@ void CGUnit_C::NamePlateAddOrUpdate(const C3Vector& position, CGWorldFrame* worl
+     }
+ }
+ 
++#if defined(_WIN64)
++// CoA: AscNamePlates do Extensions.dll (NOP8 0x7258CE, push 1 em 0x72594B, NOP12 0x98E9F9 + rel 0x1F em 0x98EA07).
++// STATIC: 0x007258CE
++int32_t g_coaNamePlates = 0;
++#endif
++
+ // VERIFY: b1479e18 auto
+ // OFFSET: 0x00725890
+ void CGUnit_C::UnitNameplatesReposition(CGWorldFrame* worldFrame) {
+@@ -20158,13 +20164,22 @@ void CGUnit_C::UnitNameplatesReposition(CGWorldFrame* worldFrame) {
+     while (frame) {
+         CGNamePlateFrame* next = s_namePlates.Next(frame);
+ 
++#if defined(_WIN64)
++        // CoA: AscNamePlates (x86: NOP8 em 0x7258CE) -> sempre o ramo "allow overlap".
++        if (g_coaNamePlates || (s_cvNameplateAllowOverlap && s_cvNameplateAllowOverlap->m_intValue)) {
++#else
+         if (s_cvNameplateAllowOverlap && s_cvNameplateAllowOverlap->m_intValue) {
++#endif
+             C3Vector position = frame->m_position;
+             frame->SetPoint(FRAMEPOINT_TOP, worldFrame, FRAMEPOINT_BOTTOMLEFT, position.x, position.y, 1);
+             frame->SetFrameDepth(position.z - worldFrame->m_layoutDepth, true);
+         } else {
+             C3Vector position = frame->m_position;
++#if defined(_WIN64)
++            SmartScreenRectPositionFrame(SRECTGRID_NAMEPLATES, frame, worldFrame, position, g_coaNamePlates);   // CoA: 0x72594B
++#else
+             SmartScreenRectPositionFrame(SRECTGRID_NAMEPLATES, frame, worldFrame, position, 0);
++#endif
+         }
+ 
+         frame = next;
+diff --git a/WoW/Source/Ui/NamePlateFrame.cpp b/WoW/Source/Ui/NamePlateFrame.cpp
+index 0dc111c..8a1b2ae 100644
+--- a/WoW/Source/Ui/NamePlateFrame.cpp
++++ b/WoW/Source/Ui/NamePlateFrame.cpp
+@@ -235,13 +235,27 @@ void CGNamePlateFrame::OnLoseFocus() {
+     this->DisableDrawLayer(4);
+ }
+ 
++#if defined(_WIN64)
++extern int32_t g_coaNamePlates;   // CoA: Unit_C.cpp
++#endif
++
+ // VERIFY: b1bdd517 manual
+ // OFFSET: 0x0098E9F0
+ void CGNamePlateFrame::OnLayerUpdate(float elapsedSec) {
++#if defined(_WIN64)
++    // CoA: AscNamePlates (x86: NOP12 em 0x98E9F9 + jne rel 0x1F em 0x98EA07) -> o nivel do frame fica com o DLL.
++    if (!g_coaNamePlates) {
++        if (this->m_guid == CGGameUI::m_lockedTarget) {
++            this->SetFrameLevel(20, 1);
++        } else {
++            this->SetFrameLevel(10, 1);
++        }
++#else
+     if (this->m_guid == CGGameUI::m_lockedTarget) {
+         this->SetFrameLevel(20, 1);
+     } else {
+         this->SetFrameLevel(10, 1);
++#endif
+     }
+ 
+     int32_t feedbackTime = this->m_damageFeedbackTime;

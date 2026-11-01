@@ -1,0 +1,24 @@
+// CoA x64: publica na maquina de teste o ultimo build OK do job de build (ou EXT/SRC dados). Manual.
+// Variaveis globais do Jenkins: COA_BUILD_HOST, COA_WORK (ver Jenkinsfile).
+// Recusa se o WowClient64 estiver aberto. Ver ci-publicar.sh.
+pipeline {
+    agent { label 'built-in' }
+    options { disableConcurrentBuilds(); buildDiscarder(logRotator(numToKeepStr: '40')); timeout(time: 20, unit: 'MINUTES') }
+    parameters {
+        string(name: 'EXT7', defaultValue: '', description: 'Opcional: ext (7 hex). Vazio = ultimo build OK')
+        string(name: 'SRC7', defaultValue: '', description: 'Opcional: src (7 hex). Vazio = ultimo build OK')
+    }
+    environment { BUILD_SERVER = "${env.COA_BUILD_HOST}"; SSH_OPTS = '-o StrictHostKeyChecking=no' }
+    stages {
+        stage('Publicar') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'build-server-ssh', usernameVariable: 'BS_USER', passwordVariable: 'BS_PASS')]) {
+                    sh '''
+                        sshpass -p "$BS_PASS" ssh $SSH_OPTS "$BS_USER@$BUILD_SERVER" \
+                          "bash $COA_WORK/ext/x64-port/ci/ci-publicar.sh $EXT7 $SRC7"
+                    '''
+                }
+            }
+        }
+    }
+}
