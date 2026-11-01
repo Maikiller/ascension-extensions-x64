@@ -8,11 +8,14 @@
 //   SAIDA    toda saida do processo (RtlExitUserProcess / TerminateProcess em si mesmo): codigo, tempo de
 //            vida e pilha de quem pediu. Codigo != 0 grava tambem Saida_<pid>_<hora>.dmp.
 //   SOLUCO   >= 200 ms sem desenhar um quadro (microtravada; batida = OnLayerRender 0x495810): duracao + amostra da pilha principal; VIVO traz o
-//            total por minuto.
+//            total por minuto. Travadas longas ganham mais amostras (~1 s, ~3 s, ~8 s): a de 150 ms so mostra o comeco.
 //   TRAVADO  >= 20 s sem desenhar: RIP + varredura da pilha da thread principal (copiada
 //            com ela suspensa por microssegundos, sem lock); RECUPEROU quando volta. Dump: procdump -h.
 //   VIVO     a cada 60 s: memoria privada, working set, handles, threads (vazamento / falta de memoria).
 // Fechamento sem nenhuma linha SAIDA = __fastfail / morte externa: o procdump (-e) ou o WER pegam o dump.
+//   Estouro de pilha: a thread principal ganha 64 KB de reserva (SetThreadStackGuarantee) e a VEH so sinaliza a
+//   thread SoHelper, que grava "EXC C00000FD" + Pilha_<pid>_<hora>.dmp. Antes as VEH estouravam de novo e o kernel
+//   matava o processo sem log nem dump.
 #include <Ascension/AscBindings.hpp>
 #include <Ascension/AscLog.hpp>
 #include <Ascension/AscRuntime.hpp>
@@ -195,9 +198,36 @@ namespace
     uintptr_t g_seen[400];
     std::atomic<int> g_seenCount{0};
 
+    // Estouro de pilha: a thread que estourou nao tem pilha para formatar log nem para o MiniDumpWriteDump. Ela so
+    // publica os ponteiros e espera; a thread SoHelper (pilha propria) grava a linha EXC e o dump.
+    HANDLE g_soEvent = nullptr, g_soDone = nullptr;
+    PEXCEPTION_POINTERS g_soEp = nullptr;
+    DWORD g_soTid = 0;
+    std::atomic<bool> g_soTaken{false};
+
+    DWORD WINAPI SoHelper(void*)
+    {
+        WaitForSingleObject(g_soEvent, INFINITE);
+        char w[160];
+        Where(reinterpret_cast<uintptr_t>(g_soEp->ExceptionRecord->ExceptionAddress), w, sizeof(w));
+        const CONTEXT& c = *g_soEp->ContextRecord;
+        Line("EXC C00000FD (estouro de pilha) em %s  rsp %llX  t%lu%s", w, c.Rsp, g_soTid, g_soTid == g_mainThread ? "  [principal]" : "");
+        Dump("Pilha", g_soEp, g_soTid);
+        SetEvent(g_soDone);
+        return 0;
+    }
+
     LONG CALLBACK Veh(PEXCEPTION_POINTERS ep)
     {
         const DWORD code = ep->ExceptionRecord->ExceptionCode;
+        if (code == EXCEPTION_STACK_OVERFLOW && g_soEvent && !g_soTaken.exchange(true))
+        {
+            // nada de printf/dbghelp aqui: so 3 chamadas de kernel32
+            g_soEp = ep;
+            g_soTid = GetCurrentThreadId();
+            SignalObjectAndWait(g_soEvent, g_soDone, 60000, FALSE);
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
         if (!Serious(code) || t_inside)
             return EXCEPTION_CONTINUE_SEARCH;
         const uintptr_t at = reinterpret_cast<uintptr_t>(ep->ExceptionRecord->ExceptionAddress);
@@ -278,13 +308,19 @@ namespace
     // Com a thread principal SUSPENSA nada que tome lock (loader, tabela de funcoes do RtlLookupFunctionEntry, heap,
     // locale do printf, dbghelp): se ela parou segurando um deles, o vigia trava junto e ela nunca e retomada --
     // foi o que congelou o jogo na bateria 2 (21:43:59). So copia contexto + pilha crua, retoma, e analisa depois.
-    uint64_t g_stackCopy[4096];   // 32 KB
-
-    CONTEXT g_sampleCtx;
-    SIZE_T g_sampleCopied = 0;
+    struct Sample
+    {
+        CONTEXT ctx;
+        SIZE_T copied;
+        ULONGLONG at;          // ms desde o ultimo quadro quando foi tirada
+        uint64_t stack[4096];  // 32 KB
+    };
+    // 0 = TRAVADO / MainStack; 1..4 = amostras de um SOLUCO (150 ms, ~1 s, ~3 s, ~8 s)
+    Sample g_samples[5];
+    const ULONGLONG kSampleAt[4] = {150, 1000, 3000, 8000};
 
     // so captura (thread suspensa por microssegundos, sem lock nenhum)
-    bool Capture()
+    bool Capture(Sample& s)
     {
         HANDLE th = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, g_mainThread);
         if (!th)
@@ -298,29 +334,38 @@ namespace
             got = GetThreadContext(th, &c) != 0;
             if (got)
             {
-                // ReadProcessMemory no proprio processo: sem SEH e sem lock; para no fim da pilha (pagina invalida)
-                for (SIZE_T off = 0; off < sizeof(g_stackCopy); off += 4096)
+                // ReadProcessMemory no proprio processo: sem SEH e sem lock; para no fim da pilha (pagina invalida).
+                // Le por PAGINA (o 1o pedaco vai do rsp ate o fim da pagina dele): ler 4 KB a partir do rsp cruza o
+                // topo da pilha quando ela esta rasa e o RPM falha inteiro -- era o "0 bytes de pilha copiados" das
+                // travadas longas em ntdll (bateria 31/10 22:44-22:46, 10-16 s).
+                SIZE_T off = 0;
+                while (off < sizeof(s.stack))
                 {
+                    const uintptr_t from = c.Rsp + off;
+                    SIZE_T len = 4096 - (from & 0xFFF);
+                    if (len > sizeof(s.stack) - off)
+                        len = sizeof(s.stack) - off;
                     SIZE_T n = 0;
-                    if (!ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<void*>(c.Rsp + off),
-                                           reinterpret_cast<uint8_t*>(g_stackCopy) + off, 4096, &n) || n != 4096)
+                    if (!ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<void*>(from),
+                                           reinterpret_cast<uint8_t*>(s.stack) + off, len, &n) || n != len)
                         break;
-                    copied = off + 4096;
+                    off += len;
                 }
+                copied = off;
             }
             ResumeThread(th);
         }
         CloseHandle(th);
-        g_sampleCtx = c;
-        g_sampleCopied = copied;
+        s.ctx = c;
+        s.copied = copied;
         return got;
     }
 
     // ja retomada: pode logar. RIP + candidatos a retorno na pilha copiada (so exe/DLL, faixas em cache).
-    void Report(const char* tag, int maxFrames)
+    void Report(const Sample& s, const char* tag, int maxFrames)
     {
-        const CONTEXT& c = g_sampleCtx;
-        const SIZE_T copied = g_sampleCopied;
+        const CONTEXT& c = s.ctx;
+        const SIZE_T copied = s.copied;
         char w[160];
         Where(c.Rip, w, sizeof(w));
         Line("  %s rip %s  (rsp %llX, %llu bytes de pilha copiados)", tag, w, static_cast<unsigned long long>(c.Rsp),
@@ -328,7 +373,7 @@ namespace
         int shown = 0;
         for (SIZE_T i = 0; i < copied / 8 && shown < maxFrames; ++i)
         {
-            const uintptr_t v = static_cast<uintptr_t>(g_stackCopy[i]);
+            const uintptr_t v = static_cast<uintptr_t>(s.stack[i]);
             if ((v >= g_exe.base && v < g_exe.end) || (v >= g_dll.base && v < g_dll.end))
             {
                 Where(v, w, sizeof(w));
@@ -339,8 +384,8 @@ namespace
 
     void MainStack(const char* tag, int maxFrames)
     {
-        if (Capture())
-            Report(tag, maxFrames);
+        if (Capture(g_samples[0]))
+            Report(g_samples[0], tag, maxFrames);
     }
 
     void Vivo(ULONGLONG now, unsigned solucos, ULONGLONG maior, ULONGLONG somaMs)
@@ -365,7 +410,15 @@ namespace
     {
         g_lastFrame.store(GetTickCount64(), std::memory_order_relaxed);
         if (!g_mainThread)
+        {
             g_mainThread = GetCurrentThreadId();
+            // Sem isto o estouro de pilha deixa so ~a pagina de guarda para o despacho + as VEH (esta e a do
+            // crash_log do exe, que faz SymInitialize/SymFromAddr): elas estouram de novo, sem guarda, e o kernel
+            // mata o processo calado -- sem EXC, sem SAIDA, sem WER (rodada 31/10 22:06, criacao de personagem).
+            ULONG reserve = 64 * 1024;
+            if (!SetThreadStackGuarantee(&reserve))
+                Line("SetThreadStackGuarantee falhou (%lu)", GetLastError());
+        }
     }
 
     // A cada 50 ms: ultimo quadro ha >= 150 ms -> captura a pilha (segura) e acompanha ate voltar:
@@ -396,8 +449,14 @@ namespace
             const ULONGLONG last = g_lastFrame.load(std::memory_order_relaxed);
             if (!last || (g_wnd && IsIconic(g_wnd)) || now - last < 150)
                 continue;
-            // sem desenhar ha >= 150 ms: captura agora, acompanha ate o proximo quadro
-            const bool amostrou = detalhados < 300 && Capture();
+            // sem desenhar ha >= 150 ms: captura agora, acompanha ate o proximo quadro (mais amostras se demorar)
+            const bool detalhar = detalhados < 300;
+            int amostras = 0;
+            if (detalhar && Capture(g_samples[1]))
+            {
+                g_samples[1].at = now - last;
+                amostras = 1;
+            }
             bool travado = false;
             while (g_lastFrame.load(std::memory_order_relaxed) == last)
             {
@@ -405,6 +464,12 @@ namespace
                 if (g_wnd && IsIconic(g_wnd))
                     break;
                 const ULONGLONG d = GetTickCount64() - last;
+                if (detalhar && amostras > 0 && amostras < 4 && d >= kSampleAt[amostras] &&
+                    Capture(g_samples[1 + amostras]))
+                {
+                    g_samples[1 + amostras].at = d;
+                    ++amostras;
+                }
                 if (!travado && d >= 20000)
                 {
                     travado = true;
@@ -424,11 +489,18 @@ namespace
                 somaMs += d;
                 if (d > maior)
                     maior = d;
-                if (amostrou && !travado)
+                if (amostras > 0 && !travado)
                 {
                     ++detalhados;
-                    Line("SOLUCO %llu ms sem desenhar (pilha aos ~150 ms):", d);
-                    Report("soluco", 10);
+                    Line("SOLUCO %llu ms sem desenhar (%d amostra(s) da pilha):", d, amostras);
+                    for (int i = 0; i < amostras; ++i)
+                    {
+                        // tag fixa "soluco": tools/bateria.py le "  soluco #NN"/"  soluco rip"
+                        Line("  amostra %d aos %llu ms:", i + 1, g_samples[1 + i].at);
+                        // nas longas o chamador fica fundo na pilha: mais quadros (48 nas amostras de >= 1 s: com 24 o
+                        // inflate do MPQ ainda nao chegava em quem pediu o arquivo -- bateria 01/11 12:52:25)
+                        Report(g_samples[1 + i], "soluco", g_samples[1 + i].at >= 1000 ? 48 : d >= 1000 ? 24 : 10);
+                    }
                 }
             }
         }
@@ -482,6 +554,12 @@ namespace
              Stamp(g_exe.base), g_dll.name, static_cast<unsigned long long>(g_dll.base), Stamp(g_dll.base),
              WerOn() ? "ligado" : "DESLIGADO (fastfail sem dump fora do procdump)");
 
+        g_soEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
+        g_soDone = CreateEventA(nullptr, TRUE, FALSE, nullptr);
+        if (HANDLE th = g_soEvent && g_soDone ? CreateThread(nullptr, 256 * 1024, &SoHelper, nullptr, 0, nullptr) : nullptr)
+            CloseHandle(th);
+        else
+            g_soEvent = nullptr;   // sem a thread auxiliar a VEH volta ao caminho normal
         AddVectoredExceptionHandler(1, &Veh);
 
         MH_STATUS s = MH_Initialize();

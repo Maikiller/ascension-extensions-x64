@@ -9,6 +9,7 @@
 // Done: all six (Creature, Quest, ItemAddon, VanityCollection, MythicKeystones, SpellAffect).
 // Returned pointers stay valid until the cache evicts them (0x400 records / 2 MB), as in the original.
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -27,6 +28,8 @@ namespace AscBridgeStore
     };
 #if !defined(_WIN64)
     static_assert(sizeof(CreatureRecord) == 0x1C, "CreatureRecord");
+#else
+    static_assert(sizeof(CreatureRecord) == 0x20 && offsetof(CreatureRecord, name) == 8, "CreatureRecord x64 (wire 0x1C via ToWire/FromWire)");
 #endif
 
     // FUN_100b8c00 -> FUN_100b8cc0: the record whose entry is `entry`, or nullptr.
@@ -63,6 +66,8 @@ namespace AscBridgeStore
     };
 #if !defined(_WIN64)
     static_assert(sizeof(VanityRecord) == 0xB4, "VanityRecord");
+#else
+    static_assert(sizeof(VanityRecord) == 0xD0 && offsetof(VanityRecord, s) == 0xB8, "VanityRecord x64 (wire 0xB4 via ToWire/FromWire)");
 #endif
     struct VanityEntry { uint32_t index; bool found; VanityRecord record; };
 

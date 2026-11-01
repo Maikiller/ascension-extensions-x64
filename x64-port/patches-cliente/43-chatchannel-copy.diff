@@ -1,0 +1,38 @@
+diff --git a/WoW/Source/Ui/ChatFrame.h b/WoW/Source/Ui/ChatFrame.h
+index a0ab946..b671113 100644
+--- a/WoW/Source/Ui/ChatFrame.h
++++ b/WoW/Source/Ui/ChatFrame.h
+@@ -162,11 +162,33 @@ struct PENDINGUSERLIST : public TSLinkedNode<PENDINGUSERLIST> {
+     /* 0014 */ uint32_t unused_0014;
+ };
+ 
++#if defined(_WIN64)
++// 43: TSGrowableArray<ChatChannel>::ReallocData (s_channels.SetCount ao entrar
++// no canal N > m_count) copia cada canal e destroi o antigo; o SMemReAlloc
++// reconstruido devolve nullptr com SMEM_FLAG_NOREALLOC, entao a copia sempre
++// roda. O copy ctor do TSList so copia o offset: a lista nova nasce vazia e o
++// ~TSList do antigo so desliga os nos (vazam, e a lista de membros pendentes
++// do canal some). Mesmo layout do TSExplicitList; a copia MOVE os nos (Combine,
++// como no ChatFrame.cpp ao listar os pendentes).
++struct ChatPendingUserList : public TSExplicitList<PENDINGUSERLIST, 0> {
++    ChatPendingUserList() {
++    }
++    ChatPendingUserList(const ChatPendingUserList& source) : TSExplicitList<PENDINGUSERLIST, 0>() {
++        this->Combine(&const_cast<ChatPendingUserList&>(source), 2, nullptr);
++    }
++    ChatPendingUserList& operator=(const ChatPendingUserList&) = delete;
++};
++#endif
++
+ class ChatChannel {
+     public:
+     /* 0000 */ int32_t m_channelNumber;
+     /* 0004 */ char m_name[128];
++#if defined(_WIN64)
++    /* 0084 */ ChatPendingUserList m_pendingUsers;
++#else
+     /* 0084 */ TSExplicitList<PENDINGUSERLIST, 0> m_pendingUsers;
++#endif
+     /* 0090 */ uint8_t m_flags;
+     /* 0094 */ uint32_t m_zoneChannelID;
+     /* 0098 */ int32_t m_unk98;

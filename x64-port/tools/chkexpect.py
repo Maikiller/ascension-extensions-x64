@@ -1,5 +1,7 @@
 """Confere bytes de WriteCodeX64/ToggleX64/applyX64/kPatchesX64 do ext contra out/WowClient64.exe (.addr)."""
 import re,glob,struct,pefile,os,sys
+sys.path.insert(0,os.path.dirname(os.path.realpath(__file__)))
+from relfields import rebase
 W=os.environ.get('COA_WORK') or os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))); E=os.environ.get('EXT',W+'/ext')
 B=os.environ.get('BASE',W+'/out'); d=open(B+'/WowClient64.addr','rb').read(); n=struct.unpack('<I',d[12:16])[0]
 A={}
@@ -12,7 +14,14 @@ def bytes_at(a,delta,k):
     return pe.get_data(r+delta,k)
 def parse_arr(s):
     return bytes(v for v in (int(x,0) for x in re.findall(r'0x[0-9A-Fa-f]+|\b\d+\b',s)) if v<256)
-bad=0; tot=0
+bad=0; tot=0; rel=0
+def same(c,got):
+    """igual direto, ou igual depois do rebase rel32/disp32 que o WriteCodeX64 faz em tempo de execucao"""
+    global rel
+    if got==c: return True
+    r,k=rebase(c,got)
+    if k and r==got: rel+=1; return True
+    return False
 for f in sorted(glob.glob(E+'/src/**/*.cpp',recursive=True)+glob.glob(E+'/WotLKExtensions/**/*.cpp',recursive=True)):
     t=open(f,errors='ignore').read()
     defs=[]
@@ -26,7 +35,7 @@ for f in sorted(glob.glob(E+'/src/**/*.cpp',recursive=True)+glob.glob(E+'/WotLKE
         a=int(m.group(1),16); dl=int(m.group(2),0); k=int(m.group(3)); new=parse_arr(m.group(4)); exp=parse_arr(m.group(5))
         tot+=1; got=bytes_at(a,dl,k); ln=t.count('\n',0,m.start())+1
         if got is None: print('SEMEND %s:%d 0x%X'%(os.path.relpath(f,E),ln,a)); bad+=1
-        elif got!=exp[:k] and got!=new[:k]: print('DIF %s:%d 0x%X%+d exe=%s exp=%s'%(os.path.relpath(f,E),ln,a,dl,got.hex(),exp[:k].hex())); bad+=1
+        elif not same(exp[:k],got) and not same(new[:k],got): print('DIF %s:%d 0x%X%+d exe=%s exp=%s'%(os.path.relpath(f,E),ln,a,dl,got.hex(),exp[:k].hex())); bad+=1
     for m in re.finditer(r'(WriteCodeX64|ToggleX64|applyX64)\(\s*(0x[0-9A-Fa-f]+)\s*,([^;]*)\);',t):
         fn=m.group(1); a=int(m.group(2),16); args=[x.strip() for x in m.group(3).split(',')]
         ln=t.count('\n',0,m.start())+1; names=[re.sub(r'.*?(\w+)\s*$',r'\1',x) for x in args]
@@ -40,6 +49,6 @@ for f in sorted(glob.glob(E+'/src/**/*.cpp',recursive=True)+glob.glob(E+'/WotLKE
         mk=re.search(r',\s*(\d+|sizeof\(\w+\))\s*,',m.group(3))
         tot+=1; got=bytes_at(a,dl,k)
         if got is None: print('SEMEND %s:%d 0x%X'%(os.path.relpath(f,E),ln,a)); bad+=1; continue
-        if not any(got==c[:k] for c in cand):
+        if not any(same(c[:k],got) for c in cand):
             print('DIF %s:%d %s 0x%X%+d exe=%s cand=%s'%(os.path.relpath(f,E),ln,fn,a,dl,got.hex(),[c[:k].hex() for c in cand])); bad+=1
-print('total',tot,'problemas',bad)
+print('total',tot,'problemas',bad,'rebase_rel',rel)

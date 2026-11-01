@@ -127,7 +127,7 @@
 0x989B97 CMovementShared::SetRawFacing +0x31
 
 # (cliente novo: 07-portrait-mask cobre) 0x61935B @0x3B941C   # SetPortraitTexture(CSimpleTexture*, const char*) +0x4C, 74 11
-0x728AA1 @0x2C7F40   # CGUnit_C::DoPowerRegen +0x90, 40 80 FF 06
+0x728AA1 CGUnit_C::DoPowerRegen [0] +0x90   # ex-@rva fixo (andou com o patch 40), 40 80 FF 06
 # --- operands-x64 / fixes-6a-4 (projects-6a)
 # (b) operandos x64 -- sites de out/operands-x64-parcial.md (x86 -> RVA x64), bytes stock x64 no comentario
 0x464C4F RealmConnection::HandleCharEnum +0x4A   # HandleCharEnum, 80 7C 24 70 0A
@@ -166,7 +166,7 @@
 0x4E57FE CGlueMgr::PatchDownloadApply +0xBF   # CGlueMgr, 72 5B
 0x707BA3 OnUpdateDurability +0xF8   # OnUpdateDurability, 7E 3C
 0x707BE2 OnUpdateDurability +0x89   # OnUpdateDurability, E8 32 86 03 00
-0x708328 @0x2F2D5A   # CGItem_C, 0F 85 86 03 00 00
+0x708328 CGItem_C::CanGoInSlot [1] +0xAA   # ex-@rva fixo, 0F 85 86 03 00 00
 0x634B07 InitResistances +0x2E   # InitResistances, 76 17
 0x74135D CGUnit_C::Dismount +0x6B   # CGUnit_C, 74 73
 0x57E9A8 CGMinimapFrame::CountAvailableTrackingTypes +0x35   # CGMinimapFrame, 0F B6 49 45

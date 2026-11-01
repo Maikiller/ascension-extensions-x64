@@ -44,7 +44,9 @@ while ($true) {
     # -> ntdll). _NO_DEBUG_HEAP=1 e herdado pelo jogo e desliga isso; crash/__fastfail continuam sendo pegos.
     $env:_NO_DEBUG_HEAP = '1'
     if (-not $SemProcdump -and (Test-Path $ProcDump)) {
-        $p = Start-Process -FilePath $ProcDump -ArgumentList @('-accepteula', '-e', '-n', '1', $TipoDump, '-x', "`"$dir`"", "`"$exe`"") `
+        # -e 1 -f: 1a chance so de estouro de pilha / __fastfail(GS) / AV -- o estouro mata o processo calado antes
+        # da 2a chance (rodada 31/10 22:06). Sem -t: dump -ma em toda saida normal seriam GBs por rodada.
+        $p = Start-Process -FilePath $ProcDump -ArgumentList @('-accepteula', '-e', '1', '-f', 'C00000FD', '-f', 'C0000409', '-f', 'C0000005', '-n', '3', $TipoDump, '-x', "`"$dir`"", "`"$exe`"") `
             -WorkingDirectory $Jogo -RedirectStandardOutput (Join-Path $dir 'procdump.txt') -NoNewWindow -PassThru -Wait
     } else {
         $p = Start-Process -FilePath $exe -WorkingDirectory $Jogo -PassThru -Wait
@@ -65,7 +67,13 @@ while ($true) {
     }
     $dumps = @(Get-ChildItem $dir -Recurse -Filter *.dmp -ErrorAction SilentlyContinue)
 
+    # Sob o procdump, $p.ExitCode e o do procdump (= no de dumps); o do jogo vem na linha "Exit Code 0x..." da saida dele.
     $codigo = if ($p) { $p.ExitCode } else { $null }
+    $pdTxt = Join-Path $dir 'procdump.txt'
+    if (-not $SemProcdump -and (Test-Path $pdTxt)) {
+        $m = Select-String -Path $pdTxt -Pattern 'Exit Code (0x[0-9A-Fa-f]+|-?\d+)' | Select-Object -Last 1
+        $codigo = if ($m) { $m.Matches[0].Groups[1].Value } else { $null }
+    }
     [ordered]@{
         id = $id; inicio = $inicio.ToString('s'); fim = $fim.ToString('s'); segundos = [int]($fim - $inicio).TotalSeconds
         codigo_saida = $codigo; procdump = (-not $SemProcdump); dll_md5 = (Md5 (Join-Path $Jogo 'Extensions64.dll'))

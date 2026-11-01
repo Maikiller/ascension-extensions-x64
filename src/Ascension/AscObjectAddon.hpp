@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -15,8 +16,11 @@ namespace AscObjectAddon
         void (__cdecl* callback)(uint32_t guidLo, uint32_t guidHi, uint32_t index, void* arg, Field* field) = nullptr;
         void* arg = nullptr;
     };
-#if !defined(_WIN64)   // CoA x64: layout de 32 bits; revisar no porte do modulo (PENDENCIAS-X64.md)
+#if !defined(_WIN64)
     static_assert(sizeof(Field) == 12, "addon field");
+#else
+    // x64: 24 bytes. Estrutura interna da DLL (vetor por GUID); ninguem depende do passo de 12 bytes.
+    static_assert(sizeof(Field) == 24, "addon field x64");
 #endif
 
     // The lookups create the record (sized) when it does not exist yet, as the originals do.

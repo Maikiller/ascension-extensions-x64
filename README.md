@@ -17,22 +17,22 @@ original.
 
 ---
 
-## 1. x64 port status (2026-11-01)
+## 1. x64 port status (2026-11-01, playable)
 
 | Item | Status |
 |---|---|
-| Last package released for testing | ext `2286089` + client `5bb308e` |
+| Last package released for testing | ext `5bc8493` + client `1ecc910` (#14) |
 | Modules enabled on x64 (`AscX64::kPorted`) | 140 |
 | Client hooks | 352 measured in the 2026-11-01 test battery, plus `0x6ECF80` enabled afterwards; of the reference's 312 real hooks, 9 are not installed (see §6) |
 | Lua natives | 1,351 in `docs/DLL_REFERENCE.md`, all in ported modules; none returns `nil` for lack of porting |
 | `checksig` (x64 signatures) | 939 ok / 0 diverging |
 | `audit_hooks` | 0 problems |
-| `chkexpect` (bytes checked before writing) | 117 sites / 0 problems |
+| `chkexpect` (bytes checked before writing) | 117 sites / 0 problems (11 rel32/disp32 fields rebased at runtime) |
 | `chkretaddr` (extra-addr lines) | 164 / 0 problems |
-| Patches to the client source | 01–38 (see §4) |
+| Patches to the client source | 01–43, applied except 41 (see §4) |
 
-The game enters the world, handles raids and teleports with `/vista 6000` (after patch 37), and runs in a loop
-under the test battery (§5.4).
+Playable day to day: enters the world, handles raids, inspects players and teleports with `/vista 6000` (after patch 37),
+and runs in a loop under the test battery (§5.4).
 
 ---
 
@@ -100,7 +100,7 @@ x64-port/
   patches-cliente/      diffs of the client source patches (01–17, 37, 38; 18–36 exist only as src commits)
   diffs/                historical diffs delivered by helper sessions during the port
   *.md                  measurements, module triage, classification of addresses with no x64 equivalent
-PENDENCIAS-X64.md       32-bit layout static_asserts and asm routines still pending
+PENDENCIAS-X64.md       x64 layout asserts and asm routines (closed 01/11)
 ```
 
 ---
@@ -118,6 +118,12 @@ PENDENCIAS-X64.md       32-bit layout static_asserts and asm routines still pend
 | 36 | globals `g_coaMistDensity`, `g_coaDayProgressOverride`, `g_coaGroundEffectDistMax` (mist, time of day, groundEffect) |
 | 37 | `CMap::scCollideList` with 0x10000 entries and bounds in the SX/SY rasterizers: it overflowed with farclip > ~4266 yards (crash in `~CM2Shared` with `/vista 6000`) — an original x86 bug |
 | 38 | `IsTitleKnown` limited to the 192 bits of `m_playerFieldKnownTitles`: a mask ≥ 192 read the currency field and reported a nonexistent title (Ascension's TitlesPanel broke while sorting) — an original x86 bug |
+
+| 39 | (reserved, unused) |
+| 40 | `SpellTableBuildSkillLineLinkInfo` looks the player up once and skips CharBaseInfo rows it would reject (~40 M iterations with CoA Custom; ~1.5 s of world entry) |
+| 41 | *proposal, not applied*: `crash_log` skips the stack walk on `EXCEPTION_STACK_OVERFLOW` and keeps the WER box (dump on silent stack-overflow deaths) |
+| 42 | `TalentGroupTab_C` copy constructor takes ownership of `m_tiers`: `TSFixedArray::ReallocData` copy-and-destroy left dangling tiers (heap corruption on `SMSG_INSPECT_TALENT` when the tab count changed) |
+| 43 | `ChatChannel::m_pendingUsers` moves on copy (the copy lost the pending list and leaked its nodes) |
 
 Numbering: each new patch takes the next number; its diff goes to `x64-port/patches-cliente/NN-name.diff` and
 the src commit is titled `CoA x64: NN-name (...)`.
@@ -149,8 +155,12 @@ From the working root on the build host:
   while the game is running.**
 
 ### 5.3 "Rebase" after a client change
-Every client patch shifts code. CI then goes red in `chkexpect`/`chkretaddr`, listing the bytes that changed
-(almost always shifted RIP-relative displacements or `call rel32`). Steps:
+Every client patch shifts code. Since `e796bfc`, `WriteCodeX64` rebases on its own: it decodes the expected and new
+bytes (an x86-64 subset), and every `rel32` (E8/E9/0F 8x) and RIP-relative `disp32` whose instruction has the same
+shape at the same position takes the shift learned from the live code (|shift| <= 1 MB); everything else is still
+compared exactly. `tools/relfields.py` mirrors the decoder so `chkexpect`/`chkretaddr` accept what the DLL accepts
+(0 problems against the 12 archived clients). What still needs a manual rebase: opcode/immediate changes and
+`@rva` lines (none active; use `Name [n] +0xOFF`). In that case CI goes red listing the bytes. Steps:
 1. read `out/ci/rebase-<src7>-chkexpect.txt` and `-chkretaddr.txt`;
 2. update the expected bytes in ext and the byte comments in `extra-addr.txt`;
 3. run `mapaddr.py` + `chkexpect.py` + `chkretaddr.py` locally against `out/cliente-<src7>/` until clean;
@@ -179,21 +189,26 @@ can produce an empty dump. The DLL's own log (`Logs\Extensions.log`) needs `-ext
 ## 6. x64 open items
 
 **No effect on x64 (need a client patch):**
-- `0x744150` selection-circle arrow turning with the unit (the detour does not receive the unit);
-- `0x7EB210` AmbientColors (inlined on x64);
 - `SetMaskTexture`; `AscClientDbc::Insert` for SMSG `0x92A` (new spell sent by the server).
+
+**Covered another way on x64 (no hook at the x86 address):**
+- `0x744150` selection-circle arrow: client patch 02 (`CGObject_C::CoaBuildSelectionRotMatrix`, called with the
+  object at the 4 x86 call sites -- Corpse_C and 3 in Unit_C);
+- `0x7EB210` AmbientColors (a folded `WowClientDB::GetRecord` on x86): detour on the caller
+  `DayNight::LoadLightIntBand` 0x7EBF30, which scales the interpolated colour by `ambientShade`;
+- `0x667EF9` per-realm WDB cache: client patch 08 (`GetCacheDirectory`).
 
 **Reference hooks x64 does not install (9) and why:**
 `0x4181B0` (anti-tamper, report only), `0x65C290` (GetRecord folded by ICF on x86; crash report only),
 `0x6348B0` and `0x83CF00` (LargeAlloc, crash report only), `0x84E350` (condition that never fires in the
-original), `0x73F660` (list with no registrant), `0x744150` and `0x7EB210` (above), `0x667EF9` (per-realm WDB
-cache: covered by patch 08, verify in game).
+original), `0x73F660` (list with no registrant), `0x744150`, `0x7EB210` and `0x667EF9` (above, covered by
+client patches 02/08 and the 0x7EBF30 detour).
 
 **Open:**
-- ~15 s hang on world entry and on logout (waiting for the per-frame detector's stack);
-- the game closes at character creation without producing a dump;
-- replace the remaining fixed RIP-relative bytes with runtime-built expectations (ends the manual rebase);
-- `PENDENCIAS-X64.md`: 32-bit layout `static_assert`s and asm routines still pending.
+- world entry ~5-9 s / logout ~3-4 s: MPQ inflate + FrameXML Lua compile + frame teardown, the same work the original
+  does (patch 40 and the empty-index `BuildSuggestionMap` exit took ~3.5 s off); compare with x86 before optimising;
+- the game closed once at character creation without a dump: likely a stack overflow (VEH re-overflowing). The
+  battery now logs it (`EXC C00000FD` + `Pilha_*.dmp`, `SetThreadStackGuarantee`); patch 41 if it happens again.
 
 **Out of scope:** Discord (x64 SDK) and NativeLogon (also off on x86); d3d9 proxy, VolFog and DLSS.
 
@@ -209,6 +224,9 @@ cache: covered by patch 08, verify in game).
 | `SetFadeOutGameObjects` writing into `.rdata` | stale `@rva` in extra-addr pointed at the string "SPELL_FA…"; now `vft:CGObject_C +0x30` |
 | `cameraTargetFocusTurnSpeed` had no effect | fixed RIP-relative bytes; now built at runtime |
 | TitlesPanel "compare nil with string" | `IsTitleKnown` without bounds (patch 38) |
+| learn-spell error suppression never applied (until #10) | stale `rel32` in `kCalls[3][5]` (CAMgr), invisible to `chkexpect`; fixed by the runtime rebase, now listed by `bateria.py` |
+| heap corruption inspecting talents | `TSFixedArray<TalentGroupTab_C>` copy-and-destroy (patch 42) |
+| CI green with a stale client | `git archive` stamps commit time; a commit older than the previous `.obj` was not recompiled. `push.sh` re-extracts changed files with the current time (`.src-sha`) and CI fails if C/C++ changed but the exe did not |
 
 ---
 

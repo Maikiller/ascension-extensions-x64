@@ -311,7 +311,7 @@ namespace
         static const uint8_t kCX64[10] = {0x81, 0x0D, 0x88, 0xBB, 0x77, 0x00, 0x89, 0x00, 0x00, 0x00};
         static const uint8_t kNop10[10] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
         const uint8_t* cur = static_cast<const uint8_t*>(AscX64::Ptr(0x80C91D));
-        const bool stock = cur && memcmp(cur, kCStockX64, 10) == 0;
+        const bool stock = AscX64::CodeMatches(cur, kCStockX64, 10);
         AscX64::WriteCodeX64(0x80C91D, on ? kNop10 : kCX64, 10, stock ? kCStockX64 : (on ? kCX64 : kNop10));   // o stock (0x80) vira candidato
 #else
         PatchBytes(0x80C8C1, on ? kNop2 : kA);

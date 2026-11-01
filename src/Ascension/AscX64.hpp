@@ -41,6 +41,11 @@ namespace AscX64
     // VirtualProtect + FlushInstructionCache. Se nao bater, loga o que achou e nao escreve. `delta` desloca o
     // destino a partir do endereco x64 resolvido (sites que o x64 duplicou, ex. as 2 copias do 0x632163).
     bool WriteCodeX64(uint32_t addr12340, const void* bytes, size_t n, const void* expect, ptrdiff_t delta = 0);
+    // Rebase dos bytes conferidos: copia para `ref` os rel32 (E8/E9/0F 8x) e disp32 RIP-relative de `live` cuja
+    // instrucao tem o mesmo formato na mesma posicao (diferenca <= 1 MB). Devolve quantos campos trocou.
+    // WriteCodeX64 ja faz isso nos dois estados; CodeMatches e a comparacao equivalente para quem le direto.
+    size_t RebaseRel(uint8_t* ref, const uint8_t* live, size_t n);
+    bool CodeMatches(const void* live, const void* ref, size_t n);
 #endif
 
     // Filtros por endereco de retorno. x86: compara com os enderecos 12340 exatos. x64: o RVA de retorno muda

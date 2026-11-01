@@ -1,0 +1,33 @@
+diff --git a/WoW/Source/Magic/MagicClient/SpellTable.cpp b/WoW/Source/Magic/MagicClient/SpellTable.cpp
+--- a/WoW/Source/Magic/MagicClient/SpellTable.cpp
++++ b/WoW/Source/Magic/MagicClient/SpellTable.cpp
+@@ -159,6 +159,15 @@
+     bool first = true;
+     int32_t lastSkillLine = -1;
+ 
++#if defined(_WIN64)
++    // CoA x64: o laco e CharBaseInfo x SkillLineAbility (CoA Custom: ~1000 x 41000 = ~40 M voltas) e o
++    // SpellTableAddSkillLineRec busca o jogador ativo (ClntObjMgrObjectPtr) em CADA volta e recusa toda linha
++    // cuja raca E classe diferem das dele. Isso rodava na 1a AddKnownSpell da entrada no mundo, dentro da travada
++    // de ~9 s (bateria 01/11 12:52:25, amostra aos 8 s). Mesmo resultado: o jogador e buscado uma vez e as linhas
++    // que seriam recusadas pulam o laco interno -- menos na 1a linha valida, que tambem monta s_skillLineLinkInfo.
++    CGPlayer_C* coaPlayer = static_cast<CGPlayer_C*>(ClntObjMgrObjectPtr(ClntObjMgrGetActivePlayer(), TYPE_PLAYER, __FILE__, __LINE__));
++#endif
++
+     for (int32_t i = 0; i < g_charBaseInfoDB.m_numRecords; i++) {
+         CharBaseInfoRec* base = (i < 0 || i >= g_charBaseInfoDB.m_numRecords) ? nullptr : &g_charBaseInfoDB.m_records[i];
+         uint8_t race = static_cast<uint8_t>(base->m_raceID);
+@@ -167,6 +176,13 @@
+             continue;
+         }
+ 
++#if defined(_WIN64)
++        if (!first && coaPlayer && race != coaPlayer->m_unit->m_unitFieldBytes0[0] &&
++            static_cast<uint8_t>(base->m_classID) != coaPlayer->m_unit->m_unitFieldBytes0[1]) {
++            continue;
++        }
++#endif
++
+         for (int32_t j = 0; j < g_skillLineAbilityDB.m_numRecords; j++) {
+             SkillLineAbilityRec* ability = (j < 0 || j >= g_skillLineAbilityDB.m_numRecords) ? nullptr : &g_skillLineAbilityDB.m_records[j];
+             SpellTableAddSkillLineRec(race, static_cast<uint8_t>(base->m_classID), ability);

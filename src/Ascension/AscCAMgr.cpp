@@ -1724,6 +1724,15 @@ namespace
     {
         const std::vector<std::pair<uint32_t, Row>>& index = KnownSpellIndex();
         map.clear();
+#if ASC_X64
+        // Indice vazio (nenhuma entrada do build ativo com magia): nenhuma linha passa no lower_bound abaixo e o
+        // mapa sai vazio do mesmo jeito -- so que o AscDbc::Get carregava a tabela inteira para isso
+        // (SpellSpellSuggestions.dbc = 353 mil linhas, ~2 s da travada de entrada no mundo em 01/11 12:52:21-24,
+        // log "[CA] suggestions: ... index 0"). Mesmo resultado sem carregar; o pacote 0x6CE/0x6D2 e quem consultar
+        // depois carregam a tabela quando precisarem.
+        if (index.empty())
+            return;
+#endif
         AscDbc::Table& t = AscDbc::Get(path);
         if (!t.Loaded())
             return;

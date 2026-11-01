@@ -257,7 +257,194 @@ bool WriteMem(uint32_t addr, const void* bytes, size_t n, const char*)
 #endif
 
 #if ASC_X64
-bool WriteCodeX64(uint32_t addr, const void* bytes, size_t n, const void* expect, ptrdiff_t delta)
+// ---- rebase em tempo de execucao ----------------------------------------------------------------------
+// Os bytes x64 dos patches levam rel32 (call/jmp/jcc near) e disp32 RIP-relative que mudam a cada build do
+// cliente. RelFields decodifica um subconjunto de x86-64 e devolve onde estao esses campos; RebaseRel copia
+// para a referencia o valor vivo de cada campo cuja instrucao tem o MESMO formato na mesma posicao (bytes
+// antes do campo iguais) e diferenca <= 1 MB. O resto dos bytes continua conferido exato.
+namespace
+{
+    struct RelField { uint8_t insn, field; };
+
+    size_t RelFields(const uint8_t* b, size_t n, RelField* out, size_t cap)
+    {
+        size_t i = 0, k = 0;
+        while (i < n && k < cap)
+        {
+            const size_t start = i;
+            bool op16 = false, rexW = false;
+            while (i < n && (b[i] == 0x66 || b[i] == 0xF2 || b[i] == 0xF3 || b[i] == 0xF0 || b[i] == 0x2E || b[i] == 0x3E ||
+                             b[i] == 0x26 || b[i] == 0x36 || b[i] == 0x64 || b[i] == 0x65))
+                op16 |= b[i++] == 0x66;
+            if (i < n && (b[i] & 0xF0) == 0x40)
+                rexW = (b[i++] & 8) != 0;
+            if (i >= n)
+                break;
+            const uint8_t op = b[i++];
+            bool modrm = false;
+            int imm = 0;          // bytes de imediato depois do modrm/disp
+            int rel32 = -1;       // offset do rel32 (sem modrm)
+            if (op == 0x0F)
+            {
+                if (i >= n) break;
+                const uint8_t o2 = b[i++];
+                if (o2 >= 0x80 && o2 <= 0x8F) rel32 = static_cast<int>(i);
+                else if (o2 == 0x38) { if (i >= n) break; ++i; modrm = true; }
+                else if (o2 == 0x3A) { if (i >= n) break; ++i; modrm = true; imm = 1; }
+                else if ((o2 >= 0x10 && o2 <= 0x1F) || (o2 >= 0x28 && o2 <= 0x2F) || (o2 >= 0x40 && o2 <= 0x6F) ||
+                         (o2 >= 0x74 && o2 <= 0x7F) || (o2 >= 0x90 && o2 <= 0x9F) || o2 == 0xA3 || o2 == 0xA5 || o2 == 0xAB ||
+                         o2 == 0xAD || o2 == 0xAF || o2 == 0xB0 || o2 == 0xB1 || o2 == 0xB3 || (o2 >= 0xB6 && o2 <= 0xB7) ||
+                         (o2 >= 0xBB && o2 <= 0xC1) || o2 == 0xC7 || (o2 >= 0xD0 && o2 <= 0xFE))
+                    modrm = true;
+                else if ((o2 >= 0x70 && o2 <= 0x73) || o2 == 0xA4 || o2 == 0xAC || o2 == 0xBA || o2 == 0xC2 ||
+                         (o2 >= 0xC4 && o2 <= 0xC6))
+                { modrm = true; imm = 1; }
+                else break;
+            }
+            else if (op == 0xE8 || op == 0xE9) rel32 = static_cast<int>(i);
+            else if (op == 0x90 || (op >= 0x50 && op <= 0x5F) || op == 0xC3 || op == 0xCC || op == 0x98 || op == 0x99 || op == 0xC9) {}
+            else if ((op >= 0x70 && op <= 0x7F) || op == 0xEB || op == 0x6A || op == 0xA8 || (op >= 0xB0 && op <= 0xB7) ||
+                     (op < 0x40 && (op & 7) == 4)) i += 1;
+            else if (op == 0x68 || op == 0xA9 || (op < 0x40 && (op & 7) == 5)) i += op16 && op != 0x68 ? 2 : 4;
+            else if (op >= 0xB8 && op <= 0xBF) i += rexW ? 8 : (op16 ? 2 : 4);
+            else if ((op < 0x40 && (op & 7) < 4) || op == 0x63 || (op >= 0x84 && op <= 0x8B) || op == 0x8D || op == 0x8F ||
+                     (op >= 0xD0 && op <= 0xD3) || (op >= 0xD8 && op <= 0xDF) || op == 0xFE || op == 0xFF)
+                modrm = true;
+            else if (op == 0x80 || op == 0x83 || op == 0xC0 || op == 0xC1 || op == 0xC6 || op == 0x6B) { modrm = true; imm = 1; }
+            else if (op == 0x81 || op == 0x69 || op == 0xC7) { modrm = true; imm = op16 ? 2 : 4; }
+            else if (op == 0xF6 || op == 0xF7)
+            {
+                if (i >= n) break;
+                modrm = true;
+                if (((b[i] >> 3) & 7) < 2) imm = op == 0xF6 ? 1 : (op16 ? 2 : 4);
+            }
+            else break;   // formato desconhecido: o resto fica estrito
+
+            if (rel32 >= 0)
+            {
+                if (static_cast<size_t>(rel32) + 4 <= n) out[k++] = {static_cast<uint8_t>(start), static_cast<uint8_t>(rel32)};
+                i = rel32 + 4;
+                continue;
+            }
+            if (modrm)
+            {
+                if (i >= n) break;
+                const uint8_t m = b[i++], mod = m >> 6, rm = m & 7;
+                if (mod != 3 && rm == 4)
+                {
+                    if (i >= n) break;
+                    const uint8_t sib = b[i++];
+                    if (mod == 0 && (sib & 7) == 5) i += 4;
+                }
+                if (mod == 0 && rm == 5)
+                {
+                    if (i + 4 <= n) out[k++] = {static_cast<uint8_t>(start), static_cast<uint8_t>(i)};
+                    i += 4;
+                }
+                else if (mod == 1) i += 1;
+                else if (mod == 2) i += 4;
+                i += imm;
+            }
+        }
+        return k;
+    }
+
+    bool HasField(const RelField* f, size_t k, RelField x)
+    {
+        for (size_t j = 0; j < k; ++j)
+            if (f[j].insn == x.insn && f[j].field == x.field) return true;
+        return false;
+    }
+}
+
+size_t RebaseRel(uint8_t* ref, const uint8_t* live, size_t n)
+{
+    if (n > 255) return 0;
+    RelField fr[32], fl[32];
+    const size_t kr = RelFields(ref, n, fr, 32), kl = RelFields(live, n, fl, 32);
+    size_t fixed = 0;
+    for (size_t j = 0; j < kr; ++j)
+    {
+        const RelField f = fr[j];
+        if (!HasField(fl, kl, f) || memcmp(ref + f.insn, live + f.insn, f.field - f.insn) != 0)
+            continue;
+        int32_t a, b;
+        memcpy(&a, ref + f.field, 4);
+        memcpy(&b, live + f.field, 4);
+        if (a == b) continue;
+        const int64_t d = static_cast<int64_t>(b) - a;
+        if (d > 0x100000 || d < -0x100000) continue;
+        memcpy(ref + f.field, live + f.field, 4);
+        ++fixed;
+    }
+    return fixed;
+}
+
+bool CodeMatches(const void* live, const void* ref, size_t n)
+{
+    if (!live || !ref || n > 255) return false;
+    uint8_t tmp[255];
+    memcpy(tmp, ref, n);
+    RebaseRel(tmp, static_cast<const uint8_t*>(live), n);
+    return memcmp(live, tmp, n) == 0;
+}
+
+namespace
+{
+    // Por site: bytes vivos do primeiro toque (o stock deste build) e o deslocamento aprendido de cada campo
+    // rel32/disp32 (vivo - referencia). O deslocamento vem primeiro do `expect` (o estado que esta no exe) e
+    // vale para o `bytes` na mesma posicao -- um jmp redirecionado anda junto com o codigo em vez de virar o
+    // alvo do stock.
+    struct Site { const uint8_t* p; size_t n; uint8_t b[64]; RelField f[8]; int32_t d[8]; size_t nf; };
+    Site g_sites[256];
+    size_t g_siteN = 0;
+    SRWLOCK g_siteLock = SRWLOCK_INIT;
+
+    Site* SiteFor(const uint8_t* p, size_t n)
+    {
+        if (n > sizeof(g_sites[0].b)) return nullptr;
+        for (size_t i = 0; i < g_siteN; ++i)
+            if (g_sites[i].p == p && g_sites[i].n == n) return &g_sites[i];
+        if (g_siteN >= 256) return nullptr;
+        Site& s = g_sites[g_siteN++];
+        s.p = p; s.n = n; s.nf = 0; memcpy(s.b, p, n);
+        return &s;
+    }
+
+    // Rebase de `arr` (copia local) no site: deslocamento aprendido, ou aprende copiando do stock vivo.
+    size_t RebaseAt(Site& s, uint8_t* arr)
+    {
+        RelField fa[32], fo[32];
+        const size_t ka = RelFields(arr, s.n, fa, 32), ko = RelFields(s.b, s.n, fo, 32);
+        size_t fixed = 0;
+        for (size_t j = 0; j < ka; ++j)
+        {
+            const RelField f = fa[j];
+            int32_t v;
+            memcpy(&v, arr + f.field, 4);
+            size_t q = 0;
+            while (q < s.nf && !(s.f[q].insn == f.insn && s.f[q].field == f.field)) ++q;
+            if (q == s.nf)
+            {
+                if (!HasField(fo, ko, f) || memcmp(arr + f.insn, s.b + f.insn, f.field - f.insn) != 0)
+                    continue;
+                int32_t live;
+                memcpy(&live, s.b + f.field, 4);
+                const int64_t d = static_cast<int64_t>(live) - v;
+                if (d > 0x100000 || d < -0x100000 || s.nf >= 8)
+                    continue;
+                s.f[s.nf] = f; s.d[s.nf] = static_cast<int32_t>(d); ++s.nf;
+            }
+            if (s.d[q] == 0) continue;
+            v += s.d[q];
+            memcpy(arr + f.field, &v, 4);
+            ++fixed;
+        }
+        return fixed;
+    }
+}
+
+bool WriteCodeX64(uint32_t addr, const void* bytesIn, size_t n, const void* expectIn, ptrdiff_t delta)
 {
     uint8_t* p = static_cast<uint8_t*>(Ptr(addr));
     if (!p)
@@ -266,6 +453,27 @@ bool WriteCodeX64(uint32_t addr, const void* bytes, size_t n, const void* expect
         return false;
     }
     p += delta;
+    // rebase: rel32/disp32 dos dois estados vem do stock vivo deste build (capturado no 1o toque)
+    uint8_t bytes[255], expectBuf[255];
+    const uint8_t* expect = nullptr;
+    if (n > sizeof(bytes))
+        return false;
+    memcpy(bytes, bytesIn, n);
+    if (expectIn)
+    {
+        memcpy(expectBuf, expectIn, n);
+        expect = expectBuf;
+    }
+    size_t fixed = 0;
+    AcquireSRWLockExclusive(&g_siteLock);
+    if (Site* site = SiteFor(p, n))
+    {
+        if (expect) fixed += RebaseAt(*site, expectBuf);   // 1o: o deslocamento sai do estado esperado
+        fixed += RebaseAt(*site, bytes);
+    }
+    ReleaseSRWLockExclusive(&g_siteLock);
+    if (fixed)
+        AscLog::Printf("x64: WriteCodeX64 0x%06X: %zu campo(s) rel32/disp32 rebaseados", addr, fixed);
     if (memcmp(p, bytes, n) == 0)
         return true;   // ja aplicado
     if (expect && memcmp(p, expect, n) != 0)

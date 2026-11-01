@@ -1,6 +1,6 @@
 # Recursos do Extensions que no x64 precisam de patch no FONTE do cliente
-- 0x7F3B60 GetSavedIndexFromDataIndex: devolver 8 em vez de 6 quando chamado de 0x57BF59 (filtro por endereco de retorno).
-- 0x744150 BuildSelectionRotMatrix: girar a seta do circulo de selecao com a unidade (ObjectSelectionCircleTexture 2/3); x86 usava o ecx do chamador.
+- FEITO (patch 01) 0x7F3B60 GetSavedIndexFromDataIndex: devolver 8 em vez de 6 quando chamado de 0x57BF59.
+- FEITO (patch 02) 0x744150 BuildSelectionRotMatrix: CoaBuildSelectionRotMatrix(objeto, ...) nos 4 chamadores do x86.
 
 # Fase de offsets (DLL)
 - ItemDisplayInfo copiado e repassado ao cliente (0x4EAA70 AddLink): no x64 passar AscClientDbc::Native(0xAD3DDC, id) e nao a copia x86 -- AscItemCollections 361/412, AscGlobalsJ 1627, AscCharacterCreate 888.
@@ -11,7 +11,7 @@
 - 0x83CF00 M2 load (CM2Shared, entre Initialize e LoadSucceededCallback)
 - 0x55F4D0 UIBindings (entre AdjustCommandKeyIndices e ExecCommand)
 - 0x6F6020 CObjectEffectManager (entre ctor e PlayOneShotEffect)
-- 0x7EB210 DayNight ambient colours
+- 0x7EB210 DayNight ambient colours -- FEITO: detour no chamador DayNight::LoadLightIntBand 0x7EBF30 (AscGraphics)
 - 0x4181B0 WinMain.cpp (após WinMain)
 - 0x4CFD20 Spell row copy: x64 coberto por AscClientDbc::Copy
 

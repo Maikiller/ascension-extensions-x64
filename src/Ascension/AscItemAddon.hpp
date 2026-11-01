@@ -2,6 +2,7 @@
 // Item addon records -- the original's ItemAddon store (FUN_101a2690, table singleton FUN_101a4fd0 =
 // 0x10BDEDE0): DBFilesClient\ItemAddon.dbc in the MemoryBridge store (AscBridgeStore), keyed by item
 // entry. SMSG_PATCH_ITEM_ADDON 0x569 (FUN_101e1800) patches single records.
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -18,8 +19,12 @@ namespace AscItemAddon
         uint32_t fields[12];         // columns 36..47, record +0x10..+0x3C
         uint32_t Quality() const { return fields[0]; }
     };
-#if !defined(_WIN64)   // CoA x64: layout de 32 bits; revisar no porte do modulo (PENDENCIAS-X64.md)
+#if !defined(_WIN64)
     static_assert(sizeof(Record) == 0x40, "Record");
+#else
+    // x64: registro nativo de 0x48 (ponteiros de 8 bytes); a ponte (MMgr64.exe) segue com o wire de 0x40 --
+    // AscBridgeStore ToWire/FromWire/StringSlot fazem a conversao (campos wire 8/0xC = name/description).
+    static_assert(sizeof(Record) == 0x48 && offsetof(Record, name) == 8 && offsetof(Record, fields) == 0x18, "Record x64");
 #endif
 
     // FUN_101a2690: nullptr when the store has no such item. Valid until the cache evicts it.

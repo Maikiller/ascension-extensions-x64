@@ -1,0 +1,30 @@
+diff --git a/WoW/Source/Ui/TalentInfo.h b/WoW/Source/Ui/TalentInfo.h
+index d4dab8c..e699e56 100644
+--- a/WoW/Source/Ui/TalentInfo.h
++++ b/WoW/Source/Ui/TalentInfo.h
+@@ -47,6 +47,25 @@ struct TalentGroupTab_C {
+     /* 000C */ TSGrowableArray<TalentGroupTier_C*> m_tiers;
+ 
+     TalentGroupTab_C();
++#if defined(_WIN64)
++    // D16: TSFixedArray<TalentGroupTab_C>::ReallocData (SetCount com contagem
++    // nova != atual e != 0) copia cada aba e destroi a antiga. O SMemReAlloc
++    // reconstruido devolve nullptr sempre que ha SMEM_FLAG_NOREALLOC, entao esse
++    // caminho de copia SEMPRE roda. A copia implicita duplica os ponteiros de
++    // m_tiers e o ~TalentGroupTab_C da antiga apaga os tiers -> a nova fica com
++    // ponteiros soltos e o proximo Reset (SMSG_INSPECT_TALENT) apaga de novo:
++    // C0000374 em ~TSFixedArray<TSExplicitList<TalentGroupTierItem_C>>.
++    // Gatilho: SetInspectTarget -> UpdateTalentGroups (sem Reset) com numero de
++    // abas diferente do alvo inspecionado antes. Aqui a copia toma a posse.
++    TalentGroupTab_C(const TalentGroupTab_C& source)
++        : m_tabId(source.m_tabId)
++        , m_pointsSpent(source.m_pointsSpent)
++        , m_previewPointsSpent(source.m_previewPointsSpent)
++        , m_tiers(source.m_tiers) {
++        const_cast<TalentGroupTab_C&>(source).m_tiers.Clear();
++    }
++    TalentGroupTab_C& operator=(const TalentGroupTab_C&) = delete;
++#endif
+     ~TalentGroupTab_C();
+     TalentGroupTier_C* FindTier(int32_t tier);
+     int32_t AddItem(const TalentRec* talent, TalentGroupItem_C* item);

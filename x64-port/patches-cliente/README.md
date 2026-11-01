@@ -124,3 +124,51 @@ Riscos / decisões suas:
 - 16: OcclusionVolume tem ponteiro em m_data. A tabela do DLL x64 precisa do layout x64 (layout.py). O ext ainda marca s_occlusionVolumesInit=0 e chama InitOcclusionVolumes (AscGraphics.cpp:529-530).
 - 17: o NOP do jne (queda) = `UpdateAnchors(1)` (force só pula o teste de queda em CalcDirection, MovementShared.cpp:178).
 - 08: no x64 passa a ser sempre por reino (é o que o hook fazia no x86).
+
+## 41 — crash_log: estouro de pilha calado (p27, 02/11)
+- `FirstChanceHandler` não chama mais `LogStack` (SymInitialize/SymFromAddr) em `EXCEPTION_STACK_OVERFLOW`, porque na sobra da página de guarda ele estourava de novo e o kernel matava o processo sem log nem dump.
+- Tira `SEM_NOGPFAULTERRORBOX` do `SetErrorMode`. Ainda não está confirmado que ele bloqueia o WER LocalDumps (0 dumps do WER em 22 rodadas); validar com um crash forçado sem o procdump.
+- Complementa o ext b254c92 (SetThreadStackGuarantee + SoHelper no AscBateria). `git apply --check -p1` ok em src/ @ coa-cliente-20261031 (5bb308e). NÃO aplicado.
+
+## 40 — SpellTableBuildSkillLineLinkInfo (0x812030): jogador buscado uma vez (b6, 02/11)
+- Travada de ~9 s ao entrar no mundo (bateria 01/11 12:52:25, amostra aos 8 s): `CGSpellBook::AddKnownSpell` →
+  `SpellTableLookupAbility` → build de `CharBaseInfo × SkillLineAbility` (~1000 × 41000 no CoA Custom, 62 no repack),
+  com `ClntObjMgrObjectPtr` em cada volta dentro de `SpellTableAddSkillLineRec`.
+- Patch (só `_WIN64`): jogador buscado uma vez; linha com raça E classe diferentes das do jogador pula o laço interno
+  (o `AddSkillLineRec` já recusaria todas), exceto a 1ª linha válida, que monta `s_skillLineLinkInfo`. Resultado igual.
+- `git apply --check -p1` OK em src/ @ 5bb308e (coa-cliente-20261031). Não aplicado nem compilado.
+
+## 42 — TalentGroupTab_C: cópia toma a posse dos tiers (c1, 02/11) — D16
+- Pilha D16 (bateria 01/11 12:41:18, C0000374): `SMemFree` ← `~TSFixedArray<TSExplicitList<TalentGroupTierItem_C>>`
+  (slots do hash de um tier) ← `~TalentGroupTab_C` ← `CGTalentGroup_C::Reset` ← `CGTalentInfo_Inspect::Reset` ←
+  `UpdateTalentData` ← `SMSG_INSPECT_TALENT`.
+- Causa: o `SMemReAlloc` reconstruído (SMem.cpp) devolve `nullptr` SEMPRE que há `SMEM_FLAG_NOREALLOC`; então
+  `TSFixedArray<T>::ReallocData` sempre copia (`new T(old)`) e destrói o antigo. `TalentGroupTab_C` não tinha cópia própria:
+  a implícita duplica os ponteiros de `m_tiers` e o `~TalentGroupTab_C` do antigo dá `delete` nos tiers → a aba nova fica
+  com ponteiros soltos e o próximo `Reset` libera de novo (double free).
+- Gatilho: `SetInspectTarget` → `UpdateTalentGroups` SEM `Reset` → `UpdateTabs` → `m_tabs.SetCount(n)` com `n` ≠ nº de
+  abas do alvo anterior (≠ 0). No 3.3.5 puro toda classe tem 3 abas (latente); no CoA a contagem varia por classe.
+  O Storm original tenta no lugar (encolher sempre dá), por isso o x86 não mostra.
+- Patch (só `_WIN64`, TalentInfo.h): construtor de cópia que copia `m_tiers` e esvazia o da origem (`const_cast` +
+  `Clear`); `operator=` deletado (não é instanciado). Muda código → RVAs andam (rebase normal).
+- `git apply --check -p1` OK em src/ @ fe04e56 (coa-cliente-20261031). Branch src `x64-c1-d16` (05276be). NÃO aplicado na
+  branch do mestre.
+- Fica de fora (avaliar): outros `TSFixedArray<T>` com T dono de ponteiro sofrem do mesmo; correção geral seria o
+  `SMemReAlloc` tentar `_expand` antes de devolver nulo, mas crescer ainda copiaria.
+
+## 43 — ChatChannel: cópia move os m_pendingUsers (c1, 02/11) — proposta, NÃO aplicado
+- Mesmo mecanismo do 42: `TSGrowableArray<ChatChannel>::ReallocData` sempre copia+destrói (SMemReAlloc NOREALLOC → nullptr).
+  `s_channels` cresce com m_count ≠ 0 em `ChatFrame.cpp` (`SetCount(number)` com N > m_count; `SetCount(m_count + 1)` sem slot livre).
+- O copy ctor do `TSList` só copia o offset: a lista nova nasce vazia, o `~TSList` do antigo só faz UnlinkAll → os nós
+  `PENDINGUSERLIST` (NewNode do SMSG_CHANNEL_LIST, nomes ainda fora do name cache) vazam e a listagem pendente do canal
+  some (o callback do name cache não acha mais ninguém). Sem corrupção de heap; efeito funcional + vazamento.
+- Patch (só `_WIN64`, ChatFrame.h): `ChatPendingUserList` = `TSExplicitList<PENDINGUSERLIST, 0>` + cópia que MOVE os nós
+  (`Combine(&src, 2, nullptr)`, o mesmo idioma de ChatFrame.cpp ao imprimir os pendentes); `operator=` deletado
+  (não há atribuição de ChatChannel). Layout igual (sem campo novo). Muda código → RVAs andam.
+- Teste: estar em ≥ 2 canais; com o name cache frio (bots recém-vistos, sem /who), `/chatlist 1` (canal com muitos
+  desconhecidos) e no MESMO instante `/join <canal novo>` (sem slot livre → s_channels cresce). Antes: a lista do canal 1
+  nunca aparece (ou sai incompleta). Depois: aparece quando os nomes chegam. Repetir 20× sem crash e sem crescer a memória.
+- `git apply --check -p1` OK em src/ @ 05276be. Branch src `x64-c1-43`.
+- Levantamento PDB (out/cliente-05276be): 253 T não-ponteiro com `TSFixedArray<T>::ReallocData`; os 139 sem <T> no OFFSET
+  são 112 `TSExplicitList<…>` (slots de TSHashTable; o grow esvazia as listas antes do SetCount → seguro) e 27 POD/deep-copy
+  (EditHistory tem cópia própria com SStrDupA). Nenhum dono de memória novo.

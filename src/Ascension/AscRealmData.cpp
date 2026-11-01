@@ -357,6 +357,7 @@ namespace
     }
 
     // FUN_102fb520: "Cache/WDB/<locale 0xC5DE88>/<realm name *(*0xC79D08 + 0x28)>".
+#if !ASC_X64
     void __cdecl BuildCachePath(char* out)
     {
         const uint8_t* realm = *reinterpret_cast<const uint8_t* const*>(ASC_PTR(0xC79D08));
@@ -367,7 +368,6 @@ namespace
     }
 
     // FUN_102fb510, jumped to from 0x667EF9 with the destination buffer in esi.
-#if !ASC_X64
     __declspec(naked) void CachePathHook()
     {
         __asm {
@@ -378,9 +378,7 @@ namespace
             jmp eax
         }
     }
-#else
-    void CachePathHook() { AscX64::Unported("CachePathHook"); }
-#endif
+#endif   // x64: sem hook -- patch 08-cache-path-realm no cliente monta Cache/WDB/<locale>/<reino> (GetCacheDirectory)
 
     // ---- entry points ---------------------------------------------------------------------------------
     // FUN_102f8820: "realmdata" with no argument returns to the stock data at once; with one, switches.
@@ -420,9 +418,7 @@ namespace
         g_openBase = reinterpret_cast<OpenBase_t>(AscRuntime::Detour(0x405DD0, 9, reinterpret_cast<void*>(&OpenBaseDetour)));
         g_openArchive = reinterpret_cast<OpenArchive_t>(AscRuntime::Detour(0x421950, 5, reinterpret_cast<void*>(&OpenArchiveDetour)));
         g_scanAddOns = reinterpret_cast<ScanAddOns_t>(AscRuntime::Detour(0x5F8F50, 6, reinterpret_cast<void*>(&ScanAddOnsDetour)));
-#if ASC_X64
-        (void)&CachePathHook;   // patch 08-cache-path: o cliente x64 ja monta Cache/WDB/<locale>/<realm>
-#else
+#if !ASC_X64   // x64: patch 08-cache-path-realm no cliente
         AscRuntime::ReplaceFunction(0x667EF9, reinterpret_cast<void*>(&CachePathHook));
 #endif
         AscRuntime::OnAfter403340(&Tick);

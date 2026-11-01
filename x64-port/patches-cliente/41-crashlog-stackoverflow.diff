@@ -1,0 +1,29 @@
+diff --git a/Tools/WowClient/crash_log.cpp b/Tools/WowClient/crash_log.cpp
+index d0483fa..384424e 100644
+--- a/Tools/WowClient/crash_log.cpp
++++ b/Tools/WowClient/crash_log.cpp
+@@ -106,7 +106,13 @@ static LONG CALLBACK FirstChanceHandler(EXCEPTION_POINTERS* info) {
+         }
+ 
+         LogLine(line);
+-        LogStack(info->ContextRecord);
++
++        // CoA x64: no estouro de pilha sobra so ~a pagina de guarda; SymInitialize/SymFromAddr + os buffers do
++        // LogStack estouravam de novo, sem guarda, e o kernel matava o processo sem log, sem WER e sem dump
++        // ("fecha na criacao de personagem", 31/10 22:06). So a linha acima; a pilha fica para o dump.
++        if (code != EXCEPTION_STACK_OVERFLOW) {
++            LogStack(info->ContextRecord);
++        }
+     }
+ 
+     return EXCEPTION_CONTINUE_SEARCH;
+@@ -148,6 +154,8 @@ static struct CrashLogInit {
+         AddVectoredExceptionHandler(1, FirstChanceHandler);
+         _CrtSetReportHook(CrtReportHook);
+         _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+-        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
++        // CoA x64: sem SEM_NOGPFAULTERRORBOX -- suspeito de impedir o WER (nao confirmado); o LocalDumps nunca gravou nada
++        // (0 dumps do WER em 22 rodadas -- validar com um crash forcado sem procdump). A caixa de erro do WER volta a aparecer num crash.
++        SetErrorMode(SEM_FAILCRITICALERRORS);
+     }
+ } s_crashLogInit;

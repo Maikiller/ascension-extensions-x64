@@ -639,6 +639,23 @@ def triagem():
         blk = [f'- `{sig}` ×{len(items)} ({own}): ' + ' ← '.join(t for t, s in res[:6])]
         L += blk
         if any(s for t, s in res): per[own] += ['### EXC de 1ª chance', ''] + blk + ['']
+    # patches de codigo que nao entraram (WriteCodeX64 recusou): antes so apareciam lendo o Extensions.log
+    wc = collections.OrderedDict()
+    for r in runs:
+        if not r.extlog or not os.path.exists(r.extlog): continue
+        for l in open(r.extlog, errors='ignore'):
+            m = re.search(r'WriteCodeX64 (0x[0-9A-F]+)\b.*?(bytes nao conferem \[[^\]]*\]|sem endereco x64|VirtualProtect falhou)', l)
+            if m:
+                g = wc.setdefault((m.group(1), re.sub(r'\[.*', '', m.group(2))), dict(n=0, runs=set(), ex=m.group(2)))
+                g['n'] += 1; g['runs'].add(r.id)
+    if wc:
+        L += ['', '## Patches de codigo recusados (WriteCodeX64)', '',
+              'Site nao escrito: bytes do exe diferentes do esperado mesmo apos o rebase rel32/disp32.', '',
+              '| site 12340 | motivo | vezes | rodadas |', '|---|---|---|---|']
+        for (a12, _), g in wc.items():
+            L.append(f"| {a12} | {g['ex']} | {g['n']} | {', '.join(sorted(g['runs']))} |")
+        per['operario-mestre'] += ['### Patches recusados (WriteCodeX64)', ''] + \
+            [f"- {a12}: {g['ex']} ×{g['n']} ({', '.join(sorted(g['runs']))})" for (a12, _), g in wc.items()] + ['']
     # microtravadas: agrupadas pelo 1o quadro util (rip se for exe/DLL, senao o 1o da varredura)
     sol = collections.OrderedDict()
     for r in runs:

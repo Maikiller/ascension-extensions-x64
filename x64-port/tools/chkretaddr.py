@@ -9,6 +9,8 @@ Uso: python3 tools/chkretaddr.py [out/WowClient64.exe] [ext]
   - "+0xOFF" que passa do tamanho da funcao (procs64.json) = erro.
 Rodar depois de cada rebuild do cliente (RVAs mudam)."""
 import json, os, re, struct, sys
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from relfields import rebase
 
 T = os.path.dirname(os.path.abspath(__file__))
 R = os.path.dirname(T)
@@ -123,7 +125,7 @@ for ln, line in enumerate(open(os.environ.get('EXTRA_ADDR') or os.path.join(T, '
     if hx:
         want = bytes.fromhex(hx.group(1))
         have = rd(rva, len(want))
-        if have != want:
+        if have != want and rebase(want, have)[0] != have:   # rel32/disp32 o DLL rebaseia sozinho
             probs.append('bytes %s != esperado %s' % (have.hex(' ').upper(), hx.group(1).upper()))
     if probs:
         bad += 1

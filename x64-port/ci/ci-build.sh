@@ -47,6 +47,13 @@ if [ "$FORCAR" = 1 ] || [ "$(cat $R/ultimo-src 2>/dev/null)" != "$SRC" ] || [ ! 
   grep -q 'WowClient.vcxproj ->' $R/cliente-$S.log || { tail -20 $R/cliente-$S.log; falha "cliente nao compilou (log out/ci/cliente-$S.log)"; }
   grep -E ' error |fatal error' $R/cliente-$S.log | head -5
   rm -f out/procs64.json; python3 tools/ent.py > /dev/null 2>&1; [ -s out/procs64.json ] || falha "procs64.json nao gerado"
+  # Trava: fonte C/C++ mudou e o exe saiu identico ao do ultimo cliente = o build incremental nao viu a mudanca
+  # (01/11: 05276be com o exe do fe04e56, data do commit mais velha que os .obj). Ver push.sh (.src-sha / tar -m).
+  P=$(cat $R/ultimo-src 2>/dev/null || true); P7=${P:0:7}
+  if [ -n "$P" ] && [ "$P7" != "$S" ] && [ -f out/cliente-$P7/WowClient64.exe ] && cmp -s out/WowClient64.exe out/cliente-$P7/WowClient64.exe \
+     && git -C $W/src diff --name-only "$P" "$SRC" | grep -qE '\.(c|cc|cpp|h|hpp|inl)$'; then
+    falha "cliente $S: exe identico ao de $P7 com fonte C/C++ diferente (build incremental nao pegou a mudanca)"
+  fi
   mkdir -p out/cliente-$S && cp out/WowClient64.exe out/WowClient64.pdb out/WowClient64.addr out/procs64.json out/cliente-$S/
   echo $SRC > $R/ultimo-src
 else
@@ -80,7 +87,7 @@ OK=1
 echo "$CS" | grep -q 'diverge 0' || OK=0
 echo "$CS" | grep -qE 'retorno_bool [1-9]' && OK=0   # bool lido como int (HasAura 01/11)
 [ "$AU" = 0 ] || OK=0
-echo "$CE" | grep -q 'problemas 0$' || OK=0
+echo "$CE" | grep -qE 'problemas 0( |$)' || OK=0
 echo "$CR" | grep -q 'problemas 0$' || OK=0
 [ $OK = 1 ] || falha "conferencias com problema: rebase/fix necessario (listas em out/ci/rebase-$S-*.txt)"
 echo "$E $S" > $R/ultimo-ok

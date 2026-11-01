@@ -31,6 +31,7 @@
 #include <Client/CNetClient.hpp>
 #include <Misc/DataContainer.hpp>
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <ctime>
 #include <sstream>
@@ -424,6 +425,11 @@ namespace
     };
 #if !defined(_WIN64)
     static_assert(sizeof(ZStream) == 0x38, "z_stream");
+#else
+    // x64: z_stream do zlib 1.2.2 do cliente (uLong = 32 bits no Win64). deflateInit2_/inflateInit2_ do WowClient64
+    // recusam stream_size != 0x58 e leem zalloc/zfree em +0x30/+0x38.
+    static_assert(sizeof(ZStream) == 0x58 && offsetof(ZStream, zalloc) == 0x30 && offsetof(ZStream, zfree) == 0x38 &&
+                  offsetof(ZStream, data_type) == 0x48, "z_stream x64");
 #endif
 #if ASC_X64
     const char* const kZlibVersion = "1.2.2";   // ZLIB_VERSION do zlib embutido no cliente (src/ThirdParty/zlib)
